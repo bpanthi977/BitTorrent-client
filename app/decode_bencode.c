@@ -50,7 +50,6 @@ LinkedList *decode_list(Cursor *cur) {
   LinkedList *head = NULL;
   LinkedList *tail = NULL;
 
-  char* start = cur->str;
   while (*(++cur->str) != 'e') {
     Value *val = decode_bencode(cur);
     if (tail == NULL) { // first item of list
@@ -63,6 +62,37 @@ LinkedList *decode_list(Cursor *cur) {
     }
   }
 
+  return head;
+}
+
+Value *read_keyval(Cursor *cur) {
+  char *key = decode_string(cur);
+  cur->str++;
+  Value *val = decode_bencode(cur);
+  KeyVal *kv = malloc(sizeof(KeyVal));
+  kv->key = key;
+  kv->val = val;
+  Value *ret = malloc(sizeof(Value));
+  ret->type = Keyval;
+  ret->val.kv = kv;
+  return ret;
+}
+
+LinkedList *decode_dict(Cursor *cur) {
+  LinkedList *head = NULL;
+  LinkedList *tail = NULL;
+
+  while (*(++cur->str) != 'e') {
+    Value *kv = read_keyval(cur);
+    if (tail == NULL) { // first item of list
+      head = cons(kv, NULL);
+      tail = head;
+    } else {
+      LinkedList *new_cell = cons(kv, NULL);
+      tail->next = new_cell;
+      tail = new_cell;
+    }
+  }
   return head;
 }
 
@@ -79,6 +109,10 @@ Value *decode_bencode(Cursor *cur) {
   } else if (cur->str[0] == 'l') {
     ret->type = List;
     ret->val.list = decode_list(cur);
+
+  } else if (cur->str[0] == 'd') {
+    ret->type = Dict;
+    ret->val.list = decode_dict(cur);
 
   } else {
     fprintf(stderr, "Only strings are supported at the moment\n");

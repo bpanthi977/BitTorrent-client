@@ -4,21 +4,32 @@
 enum Type {
   String = 1,
   Integer = 2,
-  List = 3
+  List = 3,
+  Keyval = 4,
+  Dict = 5
 };
 
 struct _LinkedList;
+struct _Value;
+
+typedef struct {
+  char *key;
+  struct _Value *val;
+} KeyVal;
 
 typedef union {
   int64_t integer;
   char* string;
-  struct _LinkedList* list;
+  struct _LinkedList *list;
+  KeyVal * kv;
 } Thing;
 
-typedef struct {
+struct _Value {
   enum Type type;
   Thing val;
-} Value;
+} _Value;
+
+typedef struct _Value Value;
 
 struct _LinkedList {
   Value* val;

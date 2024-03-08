@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "json.h"
 
 void json_print(Value *val) {
@@ -15,5 +16,20 @@ void json_print(Value *val) {
       list = list->next;
     }
     printf("]");
+  } else if (val->type == Dict) {
+    printf("{");
+    LinkedList* list = val->val.list;
+    while (list != NULL) {
+      if (list->val->type != Keyval) {
+        fprintf(stderr, "ERROR: Expected Keyval in a dictionary. Got: %d", list->val->type);
+        exit(1);
+      }
+      KeyVal *kv = list->val->val.kv;
+      printf("\"%s\":", kv->key);
+      json_print(kv->val);
+      if (list->next != NULL) printf(",");
+      list = list->next;
+    }
+    printf("}");
   }
 }
