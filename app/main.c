@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,6 +25,7 @@ int main(int argc, char* argv[]) {
         if (buffer == NULL) {
           return 1;
         }
+        char *buffer_start = buffer;
         Cursor cur = { .str = buffer };
         Value *torrent = decode_bencode(&cur);
         if (!assert_type(torrent, Dict, "Torrent file is not a valid bencode dictionary")) return 1;
@@ -39,6 +41,17 @@ int main(int argc, char* argv[]) {
 
         printf("Tracker URL: %s\n", announce->val.string);
         printf("Length: %lld\n", length->val.integer);
+
+        // Reusing same buffer for encoding
+        Cursor cur2 = {.str = buffer_start};
+        char sha_out[20];
+
+        encode_bencode(info, &cur2);
+        SHA1(sha_out, buffer_start, cur2.str - buffer_start);
+
+        printf("Info Hash: ");
+        pprint_hex((uint8_t *)sha_out, 20);
+        printf("\n");
     } else if (strcmp(command, "info-all") == 0) {
         const char *path = argv[2];
         char *buffer = read_file_to_string(path);

@@ -55,6 +55,13 @@ char *read_file_to_string(const char *path);
 // json.c
 void json_print(Value *val);
 void json_pprint(Value *val);
+void pprint_str(char* str);
+void pprint_hex(uint8_t *str, int len);
+
+
+// encode_bencode.c
+void encode_bencode(Value *val, Cursor *cur);
+
 // sha1.c
 void SHA1(char *hash_out, const char *str, uint32_t len);
 
