@@ -38,12 +38,12 @@ int main(int argc, char* argv[]) {
         if (!assert_type(info, TDict, "Torrent info is not a Dict")) return 1;
 
         Value *length = gethash(info, "length");
-        if (!assert_type(length, TInteger, "Torrent info.lenght is not an integer")) return 1;
+        if (!assert_type(length, TInteger, "Torrent info.length is not an integer")) return 1;
 
         printf("Tracker URL: %s\n", announce->val.string->str);
         printf("Length: %lld\n", length->val.integer);
 
-        // Reusing same buffer for encoding
+        // Info Hash
         Cursor cur2 = {.str = buffer_start};
         char sha_out[20];
 
@@ -53,6 +53,25 @@ int main(int argc, char* argv[]) {
         printf("Info Hash: ");
         pprint_hex((uint8_t *)sha_out, 20);
         printf("\n");
+
+        // Piece Length and Hashes
+        Value *piece_length = gethash(info, "piece length");
+        if (!assert_type(piece_length, TInteger, "Torrent info.piece_length is not an integer")) return 1;
+
+        printf("Piece Length: %lld\n", piece_length->val.integer);
+
+        Value *pieces = gethash(info, "pieces");
+        if (!assert_type(pieces, TString, "Torrent info.pieces is not an string")) return 1;
+        String *hash = pieces->val.string;
+        printf("Piece Hashes:\n");
+        {
+          int offset = 0;
+          while(offset < hash->length) {
+            pprint_hex((uint8_t *)(hash->str + offset), 20);
+            printf("\n");
+            offset += 20;
+          }
+        }
 
     } else if (strcmp(command, "info-all") == 0) {
         const char *path = argv[2];
