@@ -39,6 +39,33 @@ int64_t decode_integer(Cursor *cur) {
   return res * (negative ? -1 : 1);
 }
 
+LinkedList* cons(Value *val, LinkedList* list) {
+  LinkedList *cell = malloc(sizeof(LinkedList));
+  cell->val = val;
+  cell->next = list;
+  return cell;
+}
+
+LinkedList *decode_list(Cursor *cur) {
+  LinkedList *head = NULL;
+  LinkedList *tail = NULL;
+
+  char* start = cur->str;
+  while (*(++cur->str) != 'e') {
+    Value *val = decode_bencode(cur);
+    if (tail == NULL) { // first item of list
+      head = cons(val, NULL);
+      tail = head;
+    } else {
+      LinkedList *new_cell = cons(val, NULL);
+      tail->next = new_cell;
+      tail = new_cell;
+    }
+  }
+
+  return head;
+}
+
 Value *decode_bencode(Cursor *cur) {
   Value* ret = malloc(sizeof(Value));
   if (is_digit(cur->str[0])) {
