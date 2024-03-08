@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include "decode_bencode.h"
+#include "json.h"
 
 int main(int argc, char* argv[]) {
     if (argc < 3) {
@@ -13,8 +14,11 @@ int main(int argc, char* argv[]) {
     const char* command = argv[1];
 
     if (strcmp(command, "decode") == 0) {
-        const char* encoded_str = argv[2];
-        decode_bencode(encoded_str);
+        char *encoded_str = argv[2];
+        Cursor cur = {.str = encoded_str};
+        Value *val = decode_bencode(&cur);
+        json_print(val);
+        printf("\n");
     } else {
         fprintf(stderr, "Unknown command: %s\n", command);
         return 1;
