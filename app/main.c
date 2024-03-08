@@ -39,7 +39,14 @@ int main(int argc, char* argv[]) {
 
         printf("Tracker URL: %s\n", announce->val.string);
         printf("Length: %lld\n", length->val.integer);
-
+    } else if (strcmp(command, "info-all") == 0) {
+        const char *path = argv[2];
+        char *buffer = read_file_to_string(path);
+        if (buffer == NULL) {
+          return 1;
+        }
+        Cursor cur = { .str = buffer };
+        json_pprint(decode_bencode(&cur));
     } else {
         fprintf(stderr, "Unknown command: %s\n", command);
         return 1;

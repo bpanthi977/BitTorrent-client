@@ -54,6 +54,7 @@ char *read_file_to_string(const char *path);
 
 // json.c
 void json_print(Value *val);
+void json_pprint(Value *val);
 
 #endif
 
