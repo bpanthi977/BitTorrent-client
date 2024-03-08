@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "app.h"
 
-char* read_file_to_string(const char *path) {
+String *read_file_to_string(const char *path) {
   FILE *file = fopen(path, "rb");
   if (file == NULL) {
     fprintf(stderr, "Can't open file %s\n", path);
@@ -21,7 +22,11 @@ char* read_file_to_string(const char *path) {
     fread(buffer, length, 1, file);
     buffer[length] = '\0';
     fclose(file);
-    return buffer;
+
+    String *string = malloc(sizeof(String));
+    string->length = length;
+    string->str = buffer;
+    return string;
   } else {
     fprintf(stderr, "File is too big. Can't allocat %d bytes\n", length);
     return NULL;

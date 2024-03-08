@@ -10,7 +10,7 @@ bool is_digit(char c) {
   return c >= '0' && c <= '9';
 }
 
-char* decode_string(Cursor *cur) {
+String *decode_string(Cursor *cur) {
   int length = atoi(cur->str);
   const char* colon_index = strchr(cur->str, ':');
   if (colon_index != NULL) {
@@ -22,7 +22,11 @@ char* decode_string(Cursor *cur) {
     decoded_str[length] = '\0';
     int read = (start - cur->str + length) - 1;
     cur->str += read;
-    return decoded_str;
+
+    String *string = malloc(sizeof(String));
+    string->length = length;
+    string->str = decoded_str;
+    return string;
   } else {
     fprintf(stderr, "Couldn't decode string. Invalid value: %s\n", cur->str);
     exit(1);
@@ -69,7 +73,7 @@ LinkedList *decode_list(Cursor *cur) {
 }
 
 Value *read_keyval(Cursor *cur) {
-  char *key = decode_string(cur);
+  String *key = decode_string(cur);
   cur->str++;
   Value *val = decode_bencode(cur);
   KeyVal *kv = malloc(sizeof(KeyVal));
@@ -99,6 +103,23 @@ LinkedList *decode_dict(Cursor *cur) {
   return head;
 }
 
+bool string_equal(String* s1, char* s2) {
+  char *ss1 = s1->str;
+  int count = 0;
+  while (*s2 != '\0') {
+    if (count == s1->length)
+      return false;
+
+    if (*ss1 != *s2)
+      return false;
+
+    ss1++;
+    s2++;
+    count++;
+  }
+  return true;
+}
+
 Value *gethash(Value *dict, char *key) {
   if (!assert_type(dict, TDict, "[gethash] Expected dict. Got %d\n")) {
     exit(1);
@@ -112,7 +133,7 @@ Value *gethash(Value *dict, char *key) {
       exit(1);
     }
     KeyVal *kv = entry->val.kv;
-    if (strcmp(kv->key, key) == 0) {
+    if (string_equal(kv->key, key)) {
       return kv->val;
     }
 

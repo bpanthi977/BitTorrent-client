@@ -22,12 +22,12 @@ int main(int argc, char* argv[]) {
 
     } else if (strcmp(command, "info") == 0) {
         const char *path = argv[2];
-        char *buffer = read_file_to_string(path);
+        String *buffer = read_file_to_string(path);
         if (buffer == NULL) {
           return 1;
         }
-        char *buffer_start = buffer;
-        Cursor cur = { .str = buffer };
+        char *buffer_start = buffer->str;
+        Cursor cur = { .str = buffer->str };
         Value *torrent = decode_bencode(&cur);
         if (!assert_type(torrent, TDict, "Torrent file is not a valid bencode dictionary")) return 1;
 
@@ -40,7 +40,7 @@ int main(int argc, char* argv[]) {
         Value *length = gethash(info, "length");
         if (!assert_type(length, TInteger, "Torrent info.lenght is not an integer")) return 1;
 
-        printf("Tracker URL: %s\n", announce->val.string);
+        printf("Tracker URL: %s\n", announce->val.string->str);
         printf("Length: %lld\n", length->val.integer);
 
         // Reusing same buffer for encoding
@@ -56,11 +56,11 @@ int main(int argc, char* argv[]) {
 
     } else if (strcmp(command, "info-all") == 0) {
         const char *path = argv[2];
-        char *buffer = read_file_to_string(path);
+        String *buffer = read_file_to_string(path);
         if (buffer == NULL) {
           return 1;
         }
-        Cursor cur = { .str = buffer };
+        Cursor cur = { .str = buffer->str };
         json_pprint(decode_bencode(&cur));
 
     } else if (strcmp(command, "encode-decode") == 0) {

@@ -14,13 +14,18 @@ struct _LinkedList;
 struct _Value;
 
 typedef struct {
-  char *key;
+  int length;
+  char *str;
+} String;
+
+typedef struct {
+  String *key;
   struct _Value *val;
 } KeyVal;
 
 typedef union {
   int64_t integer;
-  char* string;
+  String *string;
   struct _LinkedList *list;
   KeyVal * kv;
 } Thing;
@@ -50,12 +55,12 @@ Value *gethash(Value *dict, char *key);
 // assert_type.c
 bool assert_type(Value *val, enum Type type, char *msg);
 // file.c
-char *read_file_to_string(const char *path);
+String *read_file_to_string(const char *path);
 
 // json.c
 void json_print(Value *val);
 void json_pprint(Value *val);
-void pprint_str(char* str);
+void pprint_str(String* string);
 void pprint_hex(uint8_t *str, int len);
 
 

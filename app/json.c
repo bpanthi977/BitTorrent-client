@@ -7,9 +7,10 @@ void pindent(int indent) {
     printf("%*s", indent, "");
 }
 
-void pprint_str(char* str) {
+void pprint_str(String* string) {
   putc('"', stdout);
-  while (*str != '\0') {
+  char *str = string->str;
+  for (int i=0; i< string->length; i++) {
     if (*str >= 32 && *str <=126) {
       putc(*str, stdout);
     } else {
@@ -55,11 +56,7 @@ void json_pprint_(Value *val, bool pretty, int indent, bool no_first_indent) {
 
   } else if (val->type == TString) {
     pindent(first_indent);
-    if (pretty) {
-      pprint_str(val->val.string);
-    } else {
-      printf("\"%s\"", val->val.string);
-    }
+    pprint_str(val->val.string);
 
   } else if (val->type == TList) {
     LinkedList* list = val->val.list;
@@ -91,7 +88,8 @@ void json_pprint_(Value *val, bool pretty, int indent, bool no_first_indent) {
       }
       KeyVal *kv = list->val->val.kv;
       pindent(next_indent);
-      printf("\"%s\":", kv->key);
+      pprint_str(kv->key);
+      printf(":");
       json_pprint_(kv->val, pretty, next_indent, true);
       if (list->next != NULL) {
         printf(",");

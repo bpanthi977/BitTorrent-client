@@ -3,10 +3,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-void encode_str(char *str, Cursor *cur) {
-  int length = strlen(str);
-  int written_chars = sprintf(cur->str, "%d:%s", length, str);
+void encode_str(String* string, Cursor *cur) {
+  int length = string->length;
+  int written_chars = sprintf(cur->str, "%d:", length);
   cur->str += written_chars;
+
+  char *str = string->str;
+  for (int i=0; i < length; i++) {
+    *(cur->str++) = *(str++);
+  }
 }
 
 void encode_number(int64_t number, Cursor *cur) {
