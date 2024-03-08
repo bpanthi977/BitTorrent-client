@@ -1,10 +1,11 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 
 bool is_digit(char c) {
-    return c >= '0' && c <= '9';
+  return c >= '0' && c <= '9';
 }
 
 char* decode_string(const char* bencoded_value) {
@@ -22,11 +23,29 @@ char* decode_string(const char* bencoded_value) {
   }
 }
 
-char* decode_bencode(const char* bencoded_value) {
-    if (is_digit(bencoded_value[0])) {
-      return decode_string(bencoded_value);
+int64_t decode_integer(const char* bencoded_value) {
+  int64_t res = 0;
+  bool negative = false;
+  while (*(++bencoded_value) != 'e') {
+    if (*bencoded_value == '-') {
+      negative = true;
     } else {
-        fprintf(stderr, "Only strings are supported at the moment\n");
-        exit(1);
+      res = res * 10 + (*bencoded_value - '0');
     }
+  }
+  return res * (negative ? -1 : 1);
+}
+
+void decode_bencode(const char* bencoded_value) {
+  if (is_digit(bencoded_value[0])) {
+    char *str = decode_string(bencoded_value);
+    printf("\"%s\"\n", str);
+    free(str);
+  } else if (bencoded_value[0] == 'i') {
+    int64_t integer = decode_integer(bencoded_value);
+    printf("%lld\n", integer);
+  } else {
+    fprintf(stderr, "Only strings are supported at the moment\n");
+    exit(1);
+  }
 }
