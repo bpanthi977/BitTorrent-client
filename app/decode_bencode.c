@@ -142,6 +142,21 @@ Value *gethash(Value *dict, char *key) {
   return NULL;
 }
 
+Value *gethash_safe(Value *dict, char *key, enum Type type) {
+  Value *val = gethash(dict, key);
+  if (val == NULL) {
+    fprintf(stderr, "No %s field found in dictionary. Expected: %d\n", key,
+            type);
+    exit(1);
+  }
+  if (val->type != type) {
+    fprintf(stderr, "Expected %d for %s field. Got: %d", type, key, val->type);
+    json_pprint(val);
+    exit(1);
+  }
+  return val;
+}
+
 Value *decode_bencode(Cursor *cur) {
   Value* ret = malloc(sizeof(Value));
   if (is_digit(cur->str[0])) {

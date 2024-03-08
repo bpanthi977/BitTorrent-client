@@ -73,6 +73,16 @@ int main(int argc, char* argv[]) {
           }
         }
 
+    } else if (strcmp(command, "peers") == 0) {
+        int buffer_size = 0;
+        Value *torrent = read_torrent_file(argv[2], &buffer_size);
+        if (torrent == NULL) return 1;
+
+        String *hash = info_hash(torrent);
+        if (hash == NULL) return 1;
+
+        pprint_hex((uint8_t *)hash->str, hash->length);
+
     } else if (strcmp(command, "info-all") == 0) {
         const char *path = argv[2];
         String *buffer = read_file_to_string(path);

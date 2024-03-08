@@ -32,3 +32,21 @@ String *read_file_to_string(const char *path) {
     return NULL;
   }
 }
+
+Value *read_torrent_file(const char* path, int* buffer_size) {
+  String *buffer = read_file_to_string(path);
+  if (buffer == NULL) {
+    return NULL;
+  }
+
+  *buffer_size = buffer->length;
+  char *buffer_start = buffer->str;
+  Cursor cur = { .str = buffer->str };
+  Value *torrent = decode_bencode(&cur);
+  free(buffer->str);
+  free(buffer);
+
+  if (!assert_type(torrent, TDict, "Torrent file is not a valid bencode dictionary")) return NULL;
+
+  return torrent;
+}
