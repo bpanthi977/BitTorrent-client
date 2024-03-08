@@ -29,16 +29,16 @@ int main(int argc, char* argv[]) {
         char *buffer_start = buffer;
         Cursor cur = { .str = buffer };
         Value *torrent = decode_bencode(&cur);
-        if (!assert_type(torrent, Dict, "Torrent file is not a valid bencode dictionary")) return 1;
+        if (!assert_type(torrent, TDict, "Torrent file is not a valid bencode dictionary")) return 1;
 
         Value *announce = gethash(torrent, "announce");
-        if (!assert_type(announce, String, "Torrent announce field is not a string")) return 1;
+        if (!assert_type(announce, TString, "Torrent announce field is not a string")) return 1;
 
         Value *info = gethash(torrent, "info");
-        if (!assert_type(info, Dict, "Torrent info is not a Dict")) return 1;
+        if (!assert_type(info, TDict, "Torrent info is not a Dict")) return 1;
 
         Value *length = gethash(info, "length");
-        if (!assert_type(length, Integer, "Torrent info.lenght is not an integer")) return 1;
+        if (!assert_type(length, TInteger, "Torrent info.lenght is not an integer")) return 1;
 
         printf("Tracker URL: %s\n", announce->val.string);
         printf("Length: %lld\n", length->val.integer);

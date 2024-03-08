@@ -29,7 +29,7 @@ void encode_dict(LinkedList *dict, Cursor *cur) {
   *cur->str = 'd';
   cur->str++;
   while (dict != NULL) {
-    if (!assert_type(dict->val, Keyval, "[encode_dict] Expected Keyval entries in dict")) {
+    if (!assert_type(dict->val, TKeyVal, "[encode_dict] Expected Keyval entries in dict")) {
       exit(1);
     }
     KeyVal *kv = dict->val->val.kv;
@@ -43,16 +43,16 @@ void encode_dict(LinkedList *dict, Cursor *cur) {
 
 void encode_bencode(Value *val, Cursor *cur) {
   switch (val->type) {
-  case String:
+  case TString:
     encode_str(val->val.string, cur);
     break;
-  case Integer:
+  case TInteger:
     encode_number(val->val.integer, cur);
     break;
-  case List:
+  case TList:
     encode_list(val->val.list, cur);
     break;
-  case Dict:
+  case TDict:
     encode_dict(val->val.list, cur);
     break;
   default:

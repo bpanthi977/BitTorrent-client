@@ -3,11 +3,11 @@
 
 #ifndef APP_INCLUDES
 enum Type {
-  String = 1,
-  Integer = 2,
-  List = 3,
-  Keyval = 4,
-  Dict = 5
+  TString = 1,
+  TInteger = 2,
+  TList = 3,
+  TKeyVal = 4,
+  TDict = 5
 };
 
 struct _LinkedList;

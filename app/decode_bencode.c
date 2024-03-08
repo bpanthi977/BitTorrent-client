@@ -76,7 +76,7 @@ Value *read_keyval(Cursor *cur) {
   kv->key = key;
   kv->val = val;
   Value *ret = malloc(sizeof(Value));
-  ret->type = Keyval;
+  ret->type = TKeyVal;
   ret->val.kv = kv;
   return ret;
 }
@@ -100,14 +100,14 @@ LinkedList *decode_dict(Cursor *cur) {
 }
 
 Value *gethash(Value *dict, char *key) {
-  if (!assert_type(dict, Dict, "[gethash] Expected dict. Got %d\n")) {
+  if (!assert_type(dict, TDict, "[gethash] Expected dict. Got %d\n")) {
     exit(1);
   }
 
   LinkedList *_entry = dict->val.list;
   while (_entry != NULL) {
     Value *entry = _entry->val;
-    if (entry->type != Keyval) {
+    if (entry->type != TKeyVal) {
       fprintf(stderr, "[BUG] dictionary entry is not a Keyval. Got %d\n", entry->type);
       exit(1);
     }
@@ -124,19 +124,19 @@ Value *gethash(Value *dict, char *key) {
 Value *decode_bencode(Cursor *cur) {
   Value* ret = malloc(sizeof(Value));
   if (is_digit(cur->str[0])) {
-    ret->type = String;
+    ret->type = TString;
     ret->val.string = decode_string(cur);
 
   } else if (cur->str[0] == 'i') {
-    ret->type = Integer;
+    ret->type = TInteger;
     ret->val.integer = decode_integer(cur);
 
   } else if (cur->str[0] == 'l') {
-    ret->type = List;
+    ret->type = TList;
     ret->val.list = decode_list(cur);
 
   } else if (cur->str[0] == 'd') {
-    ret->type = Dict;
+    ret->type = TDict;
     ret->val.list = decode_dict(cur);
 
   } else {

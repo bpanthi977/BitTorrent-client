@@ -49,11 +49,11 @@ void json_pprint_(Value *val, bool pretty, int indent, bool no_first_indent) {
   int first_indent =  no_first_indent ? 0 : indent;
   int next_indent = pretty ? indent + 2 : 0;
 
-  if (val->type == Integer) {
+  if (val->type == TInteger) {
     pindent(first_indent);
     printf("%lld", val->val.integer);
 
-  } else if (val->type == String) {
+  } else if (val->type == TString) {
     pindent(first_indent);
     if (pretty) {
       pprint_str(val->val.string);
@@ -61,7 +61,7 @@ void json_pprint_(Value *val, bool pretty, int indent, bool no_first_indent) {
       printf("\"%s\"", val->val.string);
     }
 
-  } else if (val->type == List) {
+  } else if (val->type == TList) {
     LinkedList* list = val->val.list;
     pindent(first_indent);
     printf("[");
@@ -78,14 +78,14 @@ void json_pprint_(Value *val, bool pretty, int indent, bool no_first_indent) {
     pindent(indent);
     printf("]");
 
-  } else if (val->type == Dict) {
+  } else if (val->type == TDict) {
     pindent(first_indent);
     printf("{");
     if (pretty) printf("\n");
 
     LinkedList* list = val->val.list;
     while (list != NULL) {
-      if (list->val->type != Keyval) {
+      if (list->val->type != TKeyVal) {
         fprintf(stderr, "ERROR: Expected Keyval in a dictionary. Got: %d", list->val->type);
         exit(1);
       }
