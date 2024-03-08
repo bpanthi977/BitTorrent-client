@@ -55,6 +55,8 @@ char *read_file_to_string(const char *path);
 // json.c
 void json_print(Value *val);
 void json_pprint(Value *val);
+// sha1.c
+void SHA1(char *hash_out, const char *str, uint32_t len);
 
 #endif
 
