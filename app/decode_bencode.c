@@ -1,9 +1,10 @@
+#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include "decode_bencode.h"
+#include "app.h"
 
 bool is_digit(char c) {
   return c >= '0' && c <= '9';
@@ -94,6 +95,28 @@ LinkedList *decode_dict(Cursor *cur) {
     }
   }
   return head;
+}
+
+Value *gethash(Value *dict, char *key) {
+  if (!assert_type(dict, Dict, "[gethash] Expected dict. Got %d\n")) {
+    exit(1);
+  }
+
+  LinkedList *_entry = dict->val.list;
+  while (_entry != NULL) {
+    Value *entry = _entry->val;
+    if (entry->type != Keyval) {
+      fprintf(stderr, "[BUG] dictionary entry is not a Keyval. Got %d\n", entry->type);
+      exit(1);
+    }
+    KeyVal *kv = entry->val.kv;
+    if (strcmp(kv->key, key) == 0) {
+      return kv->val;
+    }
+
+    _entry = _entry->next;
+  }
+  return NULL;
 }
 
 Value *decode_bencode(Cursor *cur) {

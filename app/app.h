@@ -1,6 +1,7 @@
 #include <stdint.h>
+#include <stdbool.h>
 
-#ifndef DECODE_BENCODE
+#ifndef APP_INCLUDES
 enum Type {
   String = 1,
   Integer = 2,
@@ -42,7 +43,18 @@ typedef struct {
   char* str;
 } Cursor;
 
-Value* decode_bencode(Cursor *cur);
+// decode_bencode.c
+Value *decode_bencode(Cursor *cur);
+Value *gethash(Value *dict, char *key);
+
+// assert_type.c
+bool assert_type(Value *val, enum Type type, char *msg);
+// file.c
+char *read_file_to_string(const char *path);
+
+// json.c
+void json_print(Value *val);
+
 #endif
 
-#define DECODE_BENCODE
+#define APP_INCLUDES 1

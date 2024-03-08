@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "json.h"
+#include "app.h"
 
 void json_print(Value *val) {
   if (val->type == Integer) {
