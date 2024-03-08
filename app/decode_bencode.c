@@ -16,13 +16,15 @@ char* decode_string(Cursor *cur) {
   if (colon_index != NULL) {
     const char* start = colon_index + 1;
     char* decoded_str = (char*)malloc(length + 1);
-    strncpy(decoded_str, start, length);
+    for (int i = 0; i < length; i++) {
+      *(decoded_str+i) = *(start+i);
+    }
     decoded_str[length] = '\0';
     int read = (start - cur->str + length) - 1;
     cur->str += read;
     return decoded_str;
   } else {
-    fprintf(stderr, "Invalid encoded value: %s\n", cur->str);
+    fprintf(stderr, "Couldn't decode string. Invalid value: %s\n", cur->str);
     exit(1);
   }
 }
