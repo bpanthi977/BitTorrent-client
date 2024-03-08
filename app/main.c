@@ -19,6 +19,7 @@ int main(int argc, char* argv[]) {
         Value *val = decode_bencode(&cur);
         json_print(val);
         printf("\n");
+
     } else if (strcmp(command, "info") == 0) {
         const char *path = argv[2];
         char *buffer = read_file_to_string(path);
@@ -52,6 +53,7 @@ int main(int argc, char* argv[]) {
         printf("Info Hash: ");
         pprint_hex((uint8_t *)sha_out, 20);
         printf("\n");
+
     } else if (strcmp(command, "info-all") == 0) {
         const char *path = argv[2];
         char *buffer = read_file_to_string(path);
@@ -60,6 +62,21 @@ int main(int argc, char* argv[]) {
         }
         Cursor cur = { .str = buffer };
         json_pprint(decode_bencode(&cur));
+
+    } else if (strcmp(command, "encode-decode") == 0) {
+        char *encoded_str = argv[2];
+
+        Cursor cur = {.str = encoded_str};
+        Value *val = decode_bencode(&cur);
+        json_pprint(val);
+        printf("\n");
+
+        char *buffer = malloc(strlen(encoded_str) + 1);
+        Cursor cur2 = { .str = buffer };
+        encode_bencode(val, &cur2);
+        *cur2.str = '\0';
+        printf("%s\n", buffer);
+
     } else {
         fprintf(stderr, "Unknown command: %s\n", command);
         return 1;
