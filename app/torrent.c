@@ -1,3 +1,5 @@
+#include <errno.h>
+#include <netinet/in.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -93,3 +95,67 @@ Value *fetch_peers(Value* torrent) {
 
   return res;
 }
+
+void send_handshake(String* infohash, int fd) {
+  // Prepare handshake message
+  char buffer[1024];
+  Cursor cur = { .str = buffer };
+  // 1 byte = 19 (decimal)
+  buffer[0] = 19; cur.str++;
+  // 19 bytes string BitTorrent protocol
+  append_str("BitTorrent protocol", &cur);
+  // 8 zero bytes
+  memset(cur.str, 0, 8); cur.str += 8;
+  // 20 bytes infohash
+  append_string(infohash, &cur);
+  // 20 bytes peer id
+  append_str("00112233445566778899", &cur);
+
+  // Send
+  send(fd, buffer, cur.str - buffer, 0);
+}
+
+void connect_peer(Peer *p, struct sockaddr_in addr) {
+  if (p->stage >= S_CONNECTED) {
+    fprintf(stderr, "[connect_peer] [BUG] Peer is already conncted. Stage: %d\n",  p->stage);
+    exit(1);
+  }
+
+  int fd = socket(PF_INET, SOCK_STREAM, 0);
+
+  if (connect(fd, (struct sockaddr *)&addr, addr.sin_len) == -1) {
+    fprintf(stderr, "Error connecting to socket. errno: %d\n",  errno);
+    exit(1);
+  }
+
+  p->sock = fd;
+  p->stage = S_CONNECTED;
+}
+
+int peer_recv(Peer *p, int max_bytes) {
+  size_t bytes = recv(p->sock, p->recvbuffer + p->recv_bytes, max_bytes, 0);
+  if (bytes == -1) {
+    fprintf(stderr, "Error occured while recv: %d\n", errno);
+    exit(1);
+  } else if (bytes == 0) {
+    fprintf(stderr, "Peer disconnected without sending\n");
+    exit(1);
+  }
+  p->recv_bytes += bytes;
+  return bytes;
+}
+
+void do_handshake(Peer *p, String* infohash) {
+  send_handshake(infohash, p->sock);
+  peer_recv(p, 1024);
+  if (p->recv_bytes < 68) {
+    fprintf(stderr, "Recieved input is invalid for handshake\n");
+    exit(1);
+  }
+
+  String peer_id = {.str = p->recvbuffer + 1 + 19 + 8 + 20, .length = 20};
+  Cursor cur = { .str = p->peer_id };
+  append_string(&peer_id, &cur);
+  p->processed_bytes += 68;
+}
+

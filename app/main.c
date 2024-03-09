@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <netinet/in.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -99,61 +100,17 @@ int main(int argc, char* argv[]) {
         if (torrent == NULL) return 1;
 
         // Get ip and port from command line
-        struct sockaddr_in peer = parse_ip_port(argv[3]);
+        struct sockaddr_in peer_addr = parse_ip_port(argv[3]);
 
-        // Open socket
-        int fd = socket(PF_INET, SOCK_STREAM, 0);
+        Peer p = {0};
+        connect_peer(&p, peer_addr);
 
-        // Connect
-        struct sockaddr_in s;
-        if (connect(fd, (struct sockaddr *)&peer, peer.sin_len) == -1) {
-          fprintf(stderr, "Error connecting to socket. errno: %d\n",  errno);
-          exit(1);
-        }
+        String *infohash = info_hash(torrent);
+        do_handshake(&p, infohash);
+        free(infohash->str);
+        free(infohash);
 
-        // Prepare handshake message
-        char buffer[1024];
-        Cursor cur = { .str = buffer };
-        // 1 byte = 19 (decimal)
-        buffer[0] = 19; cur.str++;
-        // 19 bytes string BitTorrent protocol
-        append_str("BitTorrent protocol", &cur);
-        // 8 zero bytes
-        memset(cur.str, 0, 8); cur.str += 8;
-        // 20 bytes infohash
-        String *hash = info_hash(torrent);
-        append_string(hash, &cur);
-        free(hash->str);
-        free(hash);
-        // 20 bytes peer id
-        append_str("00112233445566778899", &cur);
-
-        // Send
-        send(fd, buffer, cur.str - buffer, 0);
-        //pprint_hex(buffer, cur.str - buffer);
-        //printf("\nsent mesasge %ld bytes\n", cur.str - buffer);
-
-        // Recieve response
-        char recvbuffer[1024];
-        int bytes = recv(fd, recvbuffer, 1024, 0);
-        if (bytes == -1) {
-          fprintf(stderr, "Error occured while recv: %d\n", errno);
-          exit(1);
-        } else if (bytes == 0) {
-          fprintf(stderr, "Peer disconnected without sending\n");
-          exit(1);
-        }
-        //printf("Recieved %d bytes\n", bytes);
-        String recvstr = {.str = recvbuffer, .length = bytes};
-        //pprint_str(&recvstr);
-        //printf("\n");
-
-        if (bytes < 68) {
-          fprintf(stderr, "Recieved input is invalid\n");
-          exit(1);
-        }
-
-        String peer_id = {.str = recvbuffer + 1 + 19 + 8 + 20, .length = 20};
+        String peer_id = {.str = p.peer_id, .length = 20};
         printf("Peer ID: ");
         pprint_hex((uint8_t *)peer_id.str, peer_id.length);
         printf("\n");

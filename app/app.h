@@ -1,5 +1,7 @@
+#include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <netinet/in.h>
 
 #ifndef APP_INCLUDES
 enum Type {
@@ -75,14 +77,37 @@ void encode_bencode(Value *val, Cursor *cur);
 void SHA1(char *hash_out, const char *str, uint32_t len);
 
 // torrent.c
+enum PeerStage {
+  S_INIT = 0,
+  S_CONNECTED,
+  S_HANDSHAKE,
+  S_INTERESTED,
+  S_UNCHOKE,
+  S_DONE,
+};
+
+typedef struct Peer {
+  int sock;
+  enum PeerStage stage;
+  char recvbuffer[32 * 1024];
+  int recv_bytes;
+  int processed_bytes;
+  char peer_id[20];
+} Peer;
+
 String *info_hash(Value* torrent);
-Value *fetch_peers(Value* torrent);
+Value *fetch_peers(Value *torrent);
+void connect_peer(Peer *p, struct sockaddr_in addr);
+void do_handshake(Peer *p, String *infohash);
+
+
 
 // utils.c
 void url_encode(String *string, Cursor *cur);
 void append_string(String *string, Cursor *cur);
 void append_str(char* str, Cursor *cur);
 struct sockaddr_in parse_ip_port(char* ip_port);
+struct sockaddr_in* parse_peer_addresses(String *peers);
 
 
 #endif
