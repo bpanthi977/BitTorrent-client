@@ -65,7 +65,7 @@ Value *read_torrent_file(const char* path, int* buffer_size);
 void json_print(Value *val);
 void json_pprint(Value *val);
 void pprint_str(String* string);
-void pprint_hex(uint8_t *str, int len);
+void pprint_hex(void *str, int len);
 
 
 // encode_bencode.c

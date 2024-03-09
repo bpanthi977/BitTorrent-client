@@ -36,7 +36,9 @@ void pprint_hex_digit(int hex) {
   }
 }
 
-void pprint_hex(uint8_t *str, int len) {
+void pprint_hex(void *_str, int len) {
+  uint8_t *str = (uint8_t *)_str;
+
   for (int i = 0; i < len; i++) {
     const int hex1 = *str >> 4;
     const int hex2 = *str & 0x0F;
