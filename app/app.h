@@ -76,9 +76,12 @@ void SHA1(char *hash_out, const char *str, uint32_t len);
 
 // torrent.c
 String *info_hash(Value* torrent);
+Value *fetch_peers(Value* torrent);
 
 // utils.c
 void url_encode(String *string, Cursor *cur);
+void append_string(String *string, Cursor *cur);
+void append_str(char* str, Cursor *cur);
 
 #endif
 

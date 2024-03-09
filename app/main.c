@@ -81,8 +81,14 @@ int main(int argc, char* argv[]) {
         String *hash = info_hash(torrent);
         if (hash == NULL) return 1;
 
-        pprint_hex((uint8_t *)hash->str, hash->length);
+        Value *res = fetch_peers(torrent);
 
+        String *peers = gethash_safe(res, "peers", TString)->val.string;
+        uint8_t *s = (uint8_t *)peers->str;
+        for (int i = 0; i < peers->length; i += 6) {
+          printf("%d.%d.%d.%d:%d\n", s[0], s[1], s[2], s[3], s[4] * 256 + s[5]);
+          s+=6;
+        }
     } else if (strcmp(command, "info-all") == 0) {
         const char *path = argv[2];
         String *buffer = read_file_to_string(path);

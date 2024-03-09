@@ -34,4 +34,12 @@ void url_encode(String *string, Cursor *cur) {
   cur->str = buffer;
 }
 
+void append_string(String *string, Cursor *cur) {
+  strcpy(cur->str, string->str);
+  cur->str += string->length;
+}
+
+void append_str(char* str, Cursor *cur) {
+  strcpy(cur->str, str);
+  cur->str += strlen(str);
 }
