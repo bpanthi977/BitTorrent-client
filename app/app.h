@@ -130,7 +130,7 @@ void append_str(char* str, Cursor *cur);
 struct sockaddr_in parse_ip_port(char* ip_port);
 struct sockaddr_in* parse_peer_addresses(String *peers);
 uint32_t read_uint32(void *buffer, int offset);
-
+int ceil_division(int divident, int divisor);
 
 #endif
 

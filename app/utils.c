@@ -97,3 +97,7 @@ struct sockaddr_in* parse_peer_addresses(String *peers) {
 
   return addrs;
 }
+
+int ceil_division(int divident, int divisor) {
+  return divident / divisor + (divident % divisor == 0 ? 0 : 1);
+}

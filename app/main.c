@@ -155,6 +155,53 @@ int main(int argc, char* argv[]) {
         fclose(file);
         printf("Piece %d downloaded to %s\n", piece_idx, output_path);
 
+    } else if (strcmp(command, "download") == 0) {
+        // 1. Parse args
+        if (argc < 5) return 1;
+        char *output_path = argv[3];
+        char *input_path = argv[4];
+
+        // 2. Read torrent file
+        Value* torrent = read_torrent_file(input_path);
+        json_pprint(torrent);
+
+        // 3. Get peer addresses
+        Value *response = fetch_peers(torrent);
+        String *peers = gethash_safe(response, "peers", TString)->val.string;
+        int n_peers = (peers->length * 8 / 48);
+        struct sockaddr_in *peer_addrs = parse_peer_addresses(peers);
+
+        // 4. Handshake with a peer
+        String infohash = info_hash(torrent);
+        Peer p = {0};
+        p.buffer_size = 20 * 16 * 1024; // Enough size of 20 blocks of 16 kiB
+        p.recvbuffer = malloc(p.buffer_size);
+
+        connect_peer(&p, *peer_addrs);
+        do_handshake(&p, infohash);
+
+        // 5. Open file
+        FILE *file = fopen(output_path, "wb");
+        if (file == NULL) {
+          fprintf(stdout, "Coulndn't open output file %s\n", output_path);
+          return 1;
+        }
+
+        // 5. Download pieces and write to file
+        Value *info = gethash_safe(torrent, "info", TDict);
+        uint64_t total_size = gethash_safe(info, "length", TInteger)->val.integer;
+        uint64_t piece_size = gethash_safe(info, "piece length", TInteger)->val.integer;
+        uint32_t total_pieces = ceil_division(total_size, piece_size);
+
+        for(int piece_idx = 0; piece_idx < total_pieces; piece_idx ++) {
+          String piece = download_piece(torrent, &p, piece_idx);
+          fwrite(piece.str, 1, piece.length, file);
+        }
+
+        // 6. Close. Done.
+        fclose(file);
+        printf("Downloaded %d pieces to %s\n", total_pieces, output_path);
+
     } else if (strcmp(command, "info-all") == 0) {
         const char *path = argv[2];
         String *buffer = read_file_to_string(path);

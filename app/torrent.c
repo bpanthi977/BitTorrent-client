@@ -7,7 +7,7 @@
 #include <string.h>
 #include "app.h"
 
-#define DEBUG true
+#define DEBUG false
 
 String info_hash(Value* torrent) {
   String hash_string = { 0 };
@@ -264,9 +264,6 @@ void shift_recvbuffer(Peer *p) {
   }
   if (DEBUG) printf("[recvbuffer] recv_bytes: %d, processed_bytes: %d, buffer_size: %d\n", p->recv_bytes, p->processed_bytes, p->buffer_size);
 }
-int ceil_division(int divident, int divisor) {
-  return divident / divisor + (divident % divisor == 0 ? 0 : 1);
-}
 
 String download_piece(Value *torrent, Peer *p, int piece_idx) {
   // Compute block sizes
@@ -287,7 +284,7 @@ String download_piece(Value *torrent, Peer *p, int piece_idx) {
   uint32_t final_block_size = piece_length - (total_blocks - 1) * BLOCK_SIZE;
   if (final_block_size == 0) final_block_size = BLOCK_SIZE;
 
-  printf("Downloading piece of size %llu in %d blocks \n", piece_length, total_blocks);
+  printf("Downloading piece %d of size %llu in %d blocks \n", piece_idx, piece_length, total_blocks);
 
   // Allocate memory
   uint8_t *buffer = malloc(piece_length);
@@ -369,15 +366,24 @@ String download_piece(Value *torrent, Peer *p, int piece_idx) {
   String ret = {.str = (char *)buffer, .length = piece_length};
 
   // Verify piece hash
-  String *expected_hash = gethash_safe(info, "pieces", TString)->val.string;
-  expected_hash->str += piece_idx * 20;
-  expected_hash->length = 20;
+  String *hash = gethash_safe(info, "pieces", TString)->val.string;
+  char *expected_hash = hash->str + piece_idx * 20;
 
   char actual_hash[20];
   SHA1(actual_hash, ret.str, ret.length);
-  if (memcmp(actual_hash, expected_hash->str, 20) != 0) {
+  if (memcmp(actual_hash, expected_hash, 20) != 0) {
+    printf("[BAD] Got Hash: ");
+    pprint_hex(actual_hash, 20);
+    printf(", Expected");
+    pprint_hex(expected_hash, 20);
+    printf("\n");
+
     fprintf(stderr, "Downloaded hash doesn't match actual hash of piece");
     exit(1);
+  } else {
+    printf("[OK] Hash: ");
+    pprint_hex(actual_hash, 20);
+    printf("\n");
   }
   return ret;
 }
