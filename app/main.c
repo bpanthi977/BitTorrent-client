@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include "app.h"
@@ -98,31 +99,15 @@ int main(int argc, char* argv[]) {
         if (torrent == NULL) return 1;
 
         // Get ip and port from command line
-        char *peer = argv[3];
-        char *colon_char = strchr(peer, ':');
-        *colon_char = '\0';
-        char *peer_ip = peer, *peer_port = colon_char + 1;
-
-        // Get Addrinfo
-        int status;
-        struct addrinfo hints = {0};
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_STREAM;
-        hints.ai_flags = AI_PASSIVE;
-
-        struct addrinfo *servinfo;  // will point to the results
-
-        if ((status = getaddrinfo(peer_ip, peer_port, &hints, &servinfo)) != 0) {
-          fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
-          exit(1);
-        }
+        struct sockaddr_in peer = parse_ip_port(argv[3]);
 
         // Open socket
         int fd = socket(PF_INET, SOCK_STREAM, 0);
 
         // Connect
-        if (connect(fd, servinfo->ai_addr, servinfo->ai_addrlen) == -1) {
-          fprintf(stderr, "Error connecting to socket. errno: %d\n", errno);
+        struct sockaddr_in s;
+        if (connect(fd, (struct sockaddr *)&peer, peer.sin_len) == -1) {
+          fprintf(stderr, "Error connecting to socket. errno: %d\n",  errno);
           exit(1);
         }
 

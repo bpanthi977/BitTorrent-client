@@ -1,5 +1,10 @@
+#include <netinet/in.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include "app.h"
 
 bool uri_unreserved_charp(char c) {
@@ -42,4 +47,27 @@ void append_string(String *string, Cursor *cur) {
 void append_str(char* str, Cursor *cur) {
   strcpy(cur->str, str);
   cur->str += strlen(str);
+}
+
+struct sockaddr_in parse_ip_port(char* ip_port) {
+  uint32_t ip = 0;
+  uint8_t byte = 0;
+  while (*ip_port != '\0') {
+    if (*ip_port == '.' || *ip_port == ':') {
+      ip = ip * 256 + byte;
+      byte = 0;
+    } else {
+      uint8_t digit = *ip_port - '0';
+      byte = byte * 10 + digit;
+    }
+    if (*ip_port == ':') break;
+    ip_port++;
+  }
+
+  struct sockaddr_in peer_addr = {0};
+  peer_addr.sin_len = sizeof(struct sockaddr_in);
+  peer_addr.sin_family = AF_INET; // ipv4
+  peer_addr.sin_addr.s_addr = htonl(ip);
+  peer_addr.sin_port = htons(atoi(ip_port + 1)); // since ip_port now points ':' character
+  return peer_addr;
 }

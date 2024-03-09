@@ -82,6 +82,8 @@ Value *fetch_peers(Value* torrent);
 void url_encode(String *string, Cursor *cur);
 void append_string(String *string, Cursor *cur);
 void append_str(char* str, Cursor *cur);
+struct sockaddr_in parse_ip_port(char* ip_port);
+
 
 #endif
 
