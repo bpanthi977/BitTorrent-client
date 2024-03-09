@@ -366,6 +366,18 @@ String download_piece(Value *torrent, Peer *p, int piece_idx) {
   printf("Downloaded piece\n");
   free(asked);
   free(recieved);
-  String ret = { .str = (char *) buffer, .length = piece_length };
+  String ret = {.str = (char *)buffer, .length = piece_length};
+
+  // Verify piece hash
+  String *expected_hash = gethash_safe(info, "pieces", TString)->val.string;
+  expected_hash->str += piece_idx * 20;
+  expected_hash->length = 20;
+
+  char actual_hash[20];
+  SHA1(actual_hash, ret.str, ret.length);
+  if (memcmp(actual_hash, expected_hash->str, 20) != 0) {
+    fprintf(stderr, "Downloaded hash doesn't match actual hash of piece");
+    exit(1);
+  }
   return ret;
 }
