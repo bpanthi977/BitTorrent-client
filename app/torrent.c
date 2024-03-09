@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <curl/curl.h>
 #include <string.h>
+#include <sys/_types/_null.h>
 #include "app.h"
 
 #define DEBUG false
@@ -45,6 +46,21 @@ static size_t cb_curl_write_to_string(void *data, size_t size, size_t blocks, vo
   return realsize;
 }
 
+uint64_t torrent_total_length(Value *info) {
+  Value *length = gethash(info, "length");
+  if (length == NULL) {
+    uint64_t total_length = 0;
+    LinkedList *files = gethash_safe(info, "files", TList)->val.list;
+    while (files != NULL) {
+      total_length += gethash_safe(files->val, "length", TInteger)->val.integer;
+      files = files->next;
+    }
+    return total_length;
+  } else {
+    return length->val.integer;
+  }
+}
+
 Value *fetch_peers(Value* torrent) {
   // Send HTTP GET request at <torrent.announce> with query params:
   // info_hash = info_hash(torrent)
@@ -58,7 +74,7 @@ Value *fetch_peers(Value* torrent) {
   CURL *curl = curl_easy_init();
   String *announce = gethash_safe(torrent, "announce", TString)->val.string;
   Value *info = gethash_safe(torrent, "info", TDict);
-  int64_t length = gethash_safe(info, "length", TInteger)->val.integer; // max 20 characters
+  uint64_t length = torrent_total_length(info); // max 20 characters
   String hash = info_hash(torrent);
 
   char *url = malloc(announce->length + 400);

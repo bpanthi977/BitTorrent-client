@@ -41,11 +41,15 @@ int main(int argc, char* argv[]) {
         Value *info = gethash(torrent, "info");
         if (!assert_type(info, TDict, "Torrent info is not a Dict")) return 1;
 
-        Value *length = gethash(info, "length");
-        if (!assert_type(length, TInteger, "Torrent info.length is not an integer")) return 1;
-
+        uint64_t length = torrent_total_length(info);
         printf("Tracker URL: %s\n", announce->val.string->str);
-        printf("Length: %lld\n", length->val.integer);
+        printf("Length: %lld\n", length);
+
+        Value *files = gethash(info, "files");
+        if (files != NULL) {
+          printf("Files: ");
+          json_pprint(files);
+        }
 
         // Info Hash
         Cursor cur2 = {.str = buffer_start};

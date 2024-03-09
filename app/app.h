@@ -115,6 +115,7 @@ typedef struct Message {
   void *payload;
 } Message;
 
+uint64_t torrent_total_length(Value *info);
 String info_hash(Value* torrent);
 Value *fetch_peers(Value *torrent);
 void connect_peer(Peer *p, struct sockaddr_in addr);
