@@ -106,8 +106,10 @@ void json_pprint_(Value *val, bool pretty, int indent, bool no_first_indent) {
 
 void json_pprint(Value *val) {
   json_pprint_(val, true, 0, false);
+  printf("\n");
 }
 
 void json_print(Value *val) {
   json_pprint_(val, false, 0, false);
+  printf("\n");
 }

@@ -21,7 +21,6 @@ int main(int argc, char* argv[]) {
         Cursor cur = {.str = encoded_str};
         Value *val = decode_bencode(&cur);
         json_print(val);
-        printf("\n");
 
     } else if (strcmp(command, "info") == 0) {
         const char *path = argv[2];
@@ -189,7 +188,6 @@ int main(int argc, char* argv[]) {
         Cursor cur = {.str = encoded_str};
         Value *val = decode_bencode(&cur);
         json_pprint(val);
-        printf("\n");
 
         char *buffer = malloc(strlen(encoded_str) + 1);
         Cursor cur2 = { .str = buffer };
