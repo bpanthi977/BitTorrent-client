@@ -7,9 +7,10 @@
 #include <string.h>
 #include "app.h"
 
-String *info_hash(Value* torrent) {
+String info_hash(Value* torrent) {
+  String hash_string = { 0 };
   Value *info = gethash(torrent, "info");
-  if (!assert_type(info, TDict, "Torrent info is not a Dict")) return NULL;
+  if (!assert_type(info, TDict, "Torrent info is not a Dict")) return hash_string;
 
   String *pieces = gethash_safe(info, "pieces", TString)->val.string;
   char *buffer = malloc(pieces->length + 200);
@@ -21,9 +22,8 @@ String *info_hash(Value* torrent) {
   SHA1(hash, buffer, cur.str - buffer);
   free(buffer);
 
-  String *hash_string = malloc(sizeof(String));
-  hash_string->length = 20;
-  hash_string->str = hash;
+  hash_string.length = 20;
+  hash_string.str = hash;
   return hash_string;
 }
 
@@ -57,12 +57,12 @@ Value *fetch_peers(Value* torrent) {
   String *announce = gethash_safe(torrent, "announce", TString)->val.string;
   Value *info = gethash_safe(torrent, "info", TDict);
   int64_t length = gethash_safe(info, "length", TInteger)->val.integer; // max 20 characters
-  String *hash = info_hash(torrent);
+  String hash = info_hash(torrent);
 
   char *url = malloc(announce->length + 400);
   Cursor cur = {.str = url};
   append_string(announce, &cur);
-  append_str("?info_hash=", &cur); url_encode(hash, &cur);
+  append_str("?info_hash=", &cur); url_encode(&hash, &cur);
   append_str("&peer_id=00112233445566778899", &cur);
   append_str("&port=6881", &cur);
   append_str("&uploaded=0", &cur);
@@ -89,8 +89,7 @@ Value *fetch_peers(Value* torrent) {
   Cursor cur2 = {.str = response.str };
   Value *res = decode_bencode(&cur2);
 
-  free(hash->str);
-  free(hash);
+  free(hash.str);
   free(url);
 
   return res;
@@ -145,8 +144,8 @@ int peer_recv(Peer *p, int max_bytes) {
   return bytes;
 }
 
-void do_handshake(Peer *p, String* infohash) {
-  send_handshake(infohash, p->sock);
+void do_handshake(Peer *p, String infohash) {
+  send_handshake(&infohash, p->sock);
   peer_recv(p, 1024);
   if (p->recv_bytes < 68) {
     fprintf(stderr, "Recieved input is invalid for handshake\n");

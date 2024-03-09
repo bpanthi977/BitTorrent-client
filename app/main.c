@@ -81,8 +81,8 @@ int main(int argc, char* argv[]) {
         Value *torrent = read_torrent_file(argv[2]);
         if (torrent == NULL) return 1;
 
-        String *hash = info_hash(torrent);
-        if (hash == NULL) return 1;
+        String hash = info_hash(torrent);
+        if (hash.str == NULL) return 1;
 
         Value *res = fetch_peers(torrent);
 
@@ -105,10 +105,9 @@ int main(int argc, char* argv[]) {
         Peer p = {0};
         connect_peer(&p, peer_addr);
 
-        String *infohash = info_hash(torrent);
+        String infohash = info_hash(torrent);
         do_handshake(&p, infohash);
-        free(infohash->str);
-        free(infohash);
+        free(infohash.str);
 
         String peer_id = {.str = p.peer_id, .length = 20};
         printf("Peer ID: ");

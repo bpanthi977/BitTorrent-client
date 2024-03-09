@@ -95,10 +95,10 @@ typedef struct Peer {
   char peer_id[20];
 } Peer;
 
-String *info_hash(Value* torrent);
+String info_hash(Value* torrent);
 Value *fetch_peers(Value *torrent);
 void connect_peer(Peer *p, struct sockaddr_in addr);
-void do_handshake(Peer *p, String *infohash);
+void do_handshake(Peer *p, String infohash);
 
 
 
