@@ -42,7 +42,7 @@ void url_encode(String *string, Cursor *cur) {
 }
 
 void append_string(String *string, Cursor *cur) {
-  strcpy(cur->str, string->str);
+  memcpy(cur->str, string->str, string->length);
   cur->str += string->length;
 }
 
