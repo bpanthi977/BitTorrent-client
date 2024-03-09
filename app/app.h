@@ -80,25 +80,46 @@ void SHA1(char *hash_out, const char *str, uint32_t len);
 enum PeerStage {
   S_INIT = 0,
   S_CONNECTED,
-  S_HANDSHAKE,
-  S_INTERESTED,
-  S_UNCHOKE,
+  S_HANDSHAKED,
+  S_UNCHOKED,
   S_DONE,
 };
 
 typedef struct Peer {
   int sock;
   enum PeerStage stage;
-  char recvbuffer[32 * 1024];
+  char *recvbuffer;
+  int buffer_size;
   int recv_bytes;
   int processed_bytes;
   char peer_id[20];
 } Peer;
 
+enum MSG_TYPE {
+  MSG_NULL = -2,
+  MSG_KEEPALIVE = -1,
+  MSG_CHOKE = 0,
+  MSG_UNCHOKE = 1,
+  MSG_INTERESTED = 2,
+  MSG_NOT_INTERESTED = 3,
+  MSG_HAVE = 4,
+  MSG_BITFIELD = 5,
+  MSG_REQUEST = 6,
+  MSG_PIECE = 7,
+  MSG_CANCEL = 8,
+};
+
+typedef struct Message {
+  int length;
+  enum MSG_TYPE type;
+  void *payload;
+} Message;
+
 String info_hash(Value* torrent);
 Value *fetch_peers(Value *torrent);
 void connect_peer(Peer *p, struct sockaddr_in addr);
 void do_handshake(Peer *p, String infohash);
+String download_piece(Value *torrent, Peer *p, int piece_idx);
 
 
 
@@ -108,6 +129,7 @@ void append_string(String *string, Cursor *cur);
 void append_str(char* str, Cursor *cur);
 struct sockaddr_in parse_ip_port(char* ip_port);
 struct sockaddr_in* parse_peer_addresses(String *peers);
+uint32_t read_uint32(void *buffer, int offset);
 
 
 #endif

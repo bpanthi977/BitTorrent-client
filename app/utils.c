@@ -1,4 +1,6 @@
+#include <errno.h>
 #include <netinet/in.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -65,9 +67,33 @@ struct sockaddr_in parse_ip_port(char* ip_port) {
   }
 
   struct sockaddr_in peer_addr = {0};
-  peer_addr.sin_len = sizeof(struct sockaddr_in);
   peer_addr.sin_family = AF_INET; // ipv4
   peer_addr.sin_addr.s_addr = htonl(ip);
   peer_addr.sin_port = htons(atoi(ip_port + 1)); // since ip_port now points ':' character
   return peer_addr;
+}
+
+uint32_t read_uint32(void *buffer, int offset) {
+  uint8_t *bytes = (uint8_t *)(buffer + offset);
+  uint32_t result = ntohl(*((uint32_t *)bytes));
+  return result;
+}
+
+struct sockaddr_in* parse_peer_addresses(String *peers) {
+  // peers is a string of 48 * n bytes;
+  // 48  = 32 bits for IP and 16 bits for port (big-endian)
+  int n_peers = (peers->length * 8 / 48);
+  struct sockaddr_in *addrs = malloc(sizeof(struct sockaddr_in) * n_peers);
+
+  uint8_t *data = (uint8_t *)peers->str;
+  for (int i=0; i<n_peers; i++) {
+    struct sockaddr_in *addr = addrs + i;
+    addr->sin_family = AF_INET;
+    addr->sin_addr.s_addr = *((uint32_t *)data);
+    addr->sin_port = *((uint16_t *)(data + 4));
+
+    data+=6;
+  }
+
+  return addrs;
 }

@@ -103,6 +103,8 @@ int main(int argc, char* argv[]) {
         struct sockaddr_in peer_addr = parse_ip_port(argv[3]);
 
         Peer p = {0};
+        p.buffer_size = 10 * 1024;
+        p.recvbuffer = malloc(p.buffer_size);
         connect_peer(&p, peer_addr);
 
         String infohash = info_hash(torrent);
@@ -113,6 +115,45 @@ int main(int argc, char* argv[]) {
         printf("Peer ID: ");
         pprint_hex((uint8_t *)peer_id.str, peer_id.length);
         printf("\n");
+
+    } else if (strcmp(command, "download_piece") == 0) {
+        // 1. Parse args
+        if (argc < 6) return 1;
+        char *output_path = argv[3];
+        char *input_file = argv[4];
+        int piece_idx = atoi(argv[5]);
+
+        // 2. Read torrent file
+        Value* torrent = read_torrent_file(input_file);
+        json_pprint(torrent);
+
+        // 3. Get peer addresses
+        Value *response = fetch_peers(torrent);
+        String *peers = gethash_safe(response, "peers", TString)->val.string;
+        int n_peers = (peers->length * 8 / 48);
+        struct sockaddr_in *peer_addrs = parse_peer_addresses(peers);
+
+        // 4. Handshake with a peer
+        String infohash = info_hash(torrent);
+        Peer p = {0};
+        p.buffer_size = 20 * 16 * 1024; // Enough size of 20 blocks of 16 kiB
+        p.recvbuffer = malloc(p.buffer_size);
+
+        connect_peer(&p, *peer_addrs);
+        do_handshake(&p, infohash);
+        // 5. Download piece
+        String piece = download_piece(torrent, &p, piece_idx);
+
+        // 6. Write to file
+        FILE *file = fopen(output_path, "wb");
+        if (file == NULL) {
+          fprintf(stdout, "Coulndn't open output file %s\n", output_path);
+          return 1;
+        }
+
+        fwrite(piece.str, 1, piece.length, file);
+        fclose(file);
+        printf("Piece %d downloaded to %s\n", piece_idx, output_path);
 
     } else if (strcmp(command, "info-all") == 0) {
         const char *path = argv[2];
