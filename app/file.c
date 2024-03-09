@@ -33,13 +33,12 @@ String *read_file_to_string(const char *path) {
   }
 }
 
-Value *read_torrent_file(const char* path, int* buffer_size) {
+Value *read_torrent_file(const char* path) {
   String *buffer = read_file_to_string(path);
   if (buffer == NULL) {
     return NULL;
   }
 
-  *buffer_size = buffer->length;
   char *buffer_start = buffer->str;
   Cursor cur = { .str = buffer->str };
   Value *torrent = decode_bencode(&cur);

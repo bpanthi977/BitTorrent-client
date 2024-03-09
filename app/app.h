@@ -58,7 +58,7 @@ Value *gethash_safe(Value *dict, char *key, enum Type type);
 bool assert_type(Value *val, enum Type type, char *msg);
 // file.c
 String *read_file_to_string(const char *path);
-Value *read_torrent_file(const char* path, int* buffer_size);
+Value *read_torrent_file(const char* path);
 
 
 // json.c

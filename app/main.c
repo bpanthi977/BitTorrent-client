@@ -77,8 +77,7 @@ int main(int argc, char* argv[]) {
         }
 
     } else if (strcmp(command, "peers") == 0) {
-        int buffer_size = 0;
-        Value *torrent = read_torrent_file(argv[2], &buffer_size);
+        Value *torrent = read_torrent_file(argv[2]);
         if (torrent == NULL) return 1;
 
         String *hash = info_hash(torrent);
@@ -96,8 +95,7 @@ int main(int argc, char* argv[]) {
     } else if (strcmp(command, "handshake") == 0) {
         if (argc < 4) return 1;
 
-        int buffer_size = 0;
-        Value *torrent = read_torrent_file(argv[2], &buffer_size);
+        Value *torrent = read_torrent_file(argv[2]);
         if (torrent == NULL) return 1;
 
         // Get ip and port from command line
