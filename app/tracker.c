@@ -94,10 +94,7 @@ enum UDP_Tracker_Actions {
   A_ANNOUNCE = 1
 };
 
-struct addrinfo *get_tracker_addrs(Value *torrent) {
-  // Parse hostname and port from announce url
-  String *announce = gethash_safe(torrent, "announce", TString)->val.string;
-
+struct addrinfo *get_tracker_addrs(String *announce) {
   char hostname[announce->length];
   char port[announce->length];
   int hostname_start_idx = 6; // Length of udp://
@@ -132,7 +129,7 @@ struct addrinfo *get_tracker_addrs(Value *torrent) {
 
   struct addrinfo *addrs;
 
-  if (DEBUG) printf("tracker hostname: %s, port: %s\n", hostname, port);
+  printf("tracker hostname: %s, port: %s\n", hostname, port);
   int ret = getaddrinfo(hostname, port, &hints, &addrs);
   if (ret != 0) {
     fprintf(stderr, "failed. code: %d, msg: %s\n", ret, gai_strerror(ret));
@@ -161,15 +158,13 @@ bool udp_connect(int fd, uint64_t *connection_id) {
   uint8_t connect_res[16];
   int bytes = recv(fd, connect_res, 16, 0);
   if (DEBUG) {
-    printf("[udp_fetch_peers] recieved:\n\t ");
-    pprint_hex(&connect_res, 16);
+    printf("[udp_fetch_peers] recieved:\n\t");
+    pprint_hex(&connect_res, bytes);
     printf("\n");
   }
 
   if (bytes < 16) {
-    fprintf(stderr,
-            "[udp_fetch_peers] connect response is less than 16 bytes\n");
-    pprint_hex(connect_res, 16);
+    fprintf(stderr, "[udp_fetch_peers] connect response %d is less than 16 bytes:\n", bytes);
   } else if (*(uint32_t *)connect_res != A_CONNECT) {
     fprintf(stderr,
             "[udp_fetch_peers] connect response action_id is not connect\n");
@@ -192,12 +187,8 @@ bool udp_connect(int fd, uint64_t *connection_id) {
 
 int UDP_MAX_DATA = 65527;
 
-int udp_fetch_peers(Value *torrent, struct sockaddr_in **peers) {
-  Value *info = gethash_safe(torrent, "info", TDict);
-  uint64_t length = torrent_total_length(info); // max 20 characters
-  String infohash = info_hash(torrent);
-
-  struct addrinfo *addr, *addr0 = get_tracker_addrs(torrent);
+int udp_fetch_peers_(String *announce, String infohash, struct sockaddr_in **peers) {
+  struct addrinfo *addr, *addr0 = get_tracker_addrs(announce);
 
   // Open a socket to any one of the address
   addr = addr0;
@@ -222,6 +213,8 @@ int udp_fetch_peers(Value *torrent, struct sockaddr_in **peers) {
     addr = addr->ai_next;
   }
 
+  struct timeval timeout = { .tv_sec = 1, .tv_usec = 0};
+  setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(struct timeval));
 
   // Connect
   uint64_t connection_id;
@@ -300,6 +293,40 @@ int udp_fetch_peers(Value *torrent, struct sockaddr_in **peers) {
 
   fflush(stdout);
   return 0;
+}
+
+int udp_fetch_peers(Value *torrent, struct sockaddr_in **peers) {
+  Value *info = gethash_safe(torrent, "info", TDict);
+  String infohash = info_hash(torrent);
+  Value *ann_list = gethash(torrent, "announce-list");
+
+  if (ann_list == NULL) {
+    String *announce = gethash_safe(torrent, "announce", TString)->val.string;
+    return udp_fetch_peers_(announce, infohash, peers);
+  } else if (ann_list->type == TList) {
+    LinkedList *trackerinfo = ann_list->val.list;
+    while (trackerinfo != NULL) {
+      if (trackerinfo->val->type != TList) {
+        fprintf(stderr, "Invalid announce-list. not a list of list\n");
+        exit(1);
+      }
+      Value *announce = trackerinfo->val->val.list->val;
+      if (announce == NULL) {
+        fprintf(stderr, "Invalid announce-list element. Empty.\n");
+        exit(1);
+      } else if (announce->type != TString) {
+        fprintf(stderr, "Invalid announce-list element. not a list of string\n");
+        exit(1);
+      } else {
+        int n_peers = udp_fetch_peers_(announce->val.string, infohash, peers);
+        if (n_peers != -1) return n_peers;
+      }
+
+      trackerinfo = trackerinfo->next;
+    }
+  }
+
+  return -1;
 }
 
 int fetch_peers(Value *torrent, struct sockaddr_in **peers) {
