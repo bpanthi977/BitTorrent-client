@@ -1,5 +1,5 @@
 #include <errno.h>
-#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -79,7 +79,7 @@ uint32_t read_uint32(void *buffer, int offset) {
   return result;
 }
 
-struct sockaddr_in* parse_peer_addresses(String *peers) {
+int parse_peer_addresses(String *peers, struct sockaddr_in **peer_addrs) {
   // peers is a string of 48 * n bytes;
   // 48  = 32 bits for IP and 16 bits for port (big-endian)
   int n_peers = (peers->length * 8 / 48);
@@ -95,7 +95,14 @@ struct sockaddr_in* parse_peer_addresses(String *peers) {
     data+=6;
   }
 
-  return addrs;
+  *peer_addrs = addrs;
+  return n_peers;
+}
+
+void pprint_sockaddr(struct sockaddr_in addr) {
+  uint8_t *ip = (uint8_t *) &addr.sin_addr.s_addr;
+  uint8_t *port = (uint8_t *) &addr.sin_port;
+  printf("%d.%d.%d.%d:%d\n", ip[0], ip[1], ip[2], ip[3], port[0] * 256 + port[1]);
 }
 
 int ceil_division(int divident, int divisor) {

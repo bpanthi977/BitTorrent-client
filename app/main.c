@@ -8,9 +8,11 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <time.h>
 #include "app.h"
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
+    srand(time(NULL));
     if (argc < 3) {
         fprintf(stderr, "Usage: your_bittorrent.sh <command> <args>\n");
         return 1;
@@ -88,13 +90,13 @@ int main(int argc, char* argv[]) {
         String hash = info_hash(torrent);
         if (hash.str == NULL) return 1;
 
-        Value *res = fetch_peers(torrent);
+        struct sockaddr_in *peers;
+        int n_peers = fetch_peers(torrent, &peers);
 
-        String *peers = gethash_safe(res, "peers", TString)->val.string;
-        uint8_t *s = (uint8_t *)peers->str;
-        for (int i = 0; i < peers->length; i += 6) {
-          printf("%d.%d.%d.%d:%d\n", s[0], s[1], s[2], s[3], s[4] * 256 + s[5]);
-          s+=6;
+        struct sockaddr_in *p = peers;
+        for (int i=0; i<n_peers; i++) {
+          pprint_sockaddr(*p);
+          p++;
         }
 
     } else if (strcmp(command, "handshake") == 0) {
@@ -132,10 +134,12 @@ int main(int argc, char* argv[]) {
         json_pprint(torrent);
 
         // 3. Get peer addresses
-        Value *response = fetch_peers(torrent);
-        String *peers = gethash_safe(response, "peers", TString)->val.string;
-        int n_peers = (peers->length * 8 / 48);
-        struct sockaddr_in *peer_addrs = parse_peer_addresses(peers);
+        struct sockaddr_in *peer_addrs;
+        int n_peers = fetch_peers(torrent, &peer_addrs);
+        if (n_peers <= 0) {
+          fprintf(stderr, "Couldn't find peers. Quitting. %d\n", n_peers);
+          return 1;
+        }
 
         // 4. Handshake with a peer
         String infohash = info_hash(torrent);
@@ -170,10 +174,12 @@ int main(int argc, char* argv[]) {
         json_pprint(torrent);
 
         // 3. Get peer addresses
-        Value *response = fetch_peers(torrent);
-        String *peers = gethash_safe(response, "peers", TString)->val.string;
-        int n_peers = (peers->length * 8 / 48);
-        struct sockaddr_in *peer_addrs = parse_peer_addresses(peers);
+        struct sockaddr_in *peer_addrs;
+        int n_peers = fetch_peers(torrent, &peer_addrs);
+        if (n_peers <= 0) {
+          fprintf(stderr, "Couldn't find peers. Quitting. %d\n", n_peers);
+          return 1;
+        }
 
         // 4. Handshake with a peer
         String infohash = info_hash(torrent);

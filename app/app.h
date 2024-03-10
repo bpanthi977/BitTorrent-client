@@ -117,21 +117,30 @@ typedef struct Message {
 
 uint64_t torrent_total_length(Value *info);
 String info_hash(Value* torrent);
-Value *fetch_peers(Value *torrent);
 void connect_peer(Peer *p, struct sockaddr_in addr);
 void do_handshake(Peer *p, String infohash);
 String download_piece(Value *torrent, Peer *p, int piece_idx);
 
-
+// tracker.c
+int fetch_peers(Value *torrent, struct sockaddr_in **peers);
 
 // utils.c
 void url_encode(String *string, Cursor *cur);
 void append_string(String *string, Cursor *cur);
 void append_str(char* str, Cursor *cur);
 struct sockaddr_in parse_ip_port(char* ip_port);
-struct sockaddr_in* parse_peer_addresses(String *peers);
+int parse_peer_addresses(String *peers, struct sockaddr_in **peer_addrs);
 uint32_t read_uint32(void *buffer, int offset);
 int ceil_division(int divident, int divisor);
+void pprint_sockaddr(struct sockaddr_in addr);
+
+#ifndef htonll
+#define htonll(x) ((1==htonl(1)) ? (x) : (((uint64_t)htonl((x) & 0xFFFFFFFFUL)) << 32) | htonl((uint32_t)((x) >> 32)))
+#endif
+
+#ifndef ntohll
+#define ntohll(x) ((1==ntohl(1)) ? (x) : (((uint64_t)ntohl((x) & 0xFFFFFFFFUL)) << 32) | ntohl((uint32_t)((x) >> 32)))
+#endif
 
 #endif
 
