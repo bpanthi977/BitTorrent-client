@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <netinet/in.h>
+#include <stdio.h>
 
 #ifndef APP_INCLUDES
 enum Type {
@@ -79,23 +80,37 @@ void SHA1(char *hash_out, const char *str, uint32_t len);
 // torrent.c
 enum PeerStage {
   S_INIT = 0,
+  S_CONNECTING,
   S_CONNECTED,
+  S_WAIT_HANDSHAKE,
   S_HANDSHAKED,
-  S_UNCHOKED,
+  S_ACTIVE,
+  S_ERROR,
   S_DONE,
 };
 
+struct _Piece;
 typedef struct Peer {
+  int peer_idx;
   int sock;
   enum PeerStage stage;
-  char *recvbuffer;
+  uint8_t *bitmap;
+  uint8_t bitmap_size;
+
+  uint8_t *recvbuffer;
   int buffer_size;
   int recv_bytes;
   int processed_bytes;
   char peer_id[20];
+
+  bool interested;
+  bool unchoked;
+  // When stage = S_ACTIVE
+  struct _Piece *piece;
 } Peer;
 
 enum MSG_TYPE {
+  MSG_INCOMPLETE = -3,
   MSG_NULL = -2,
   MSG_KEEPALIVE = -1,
   MSG_CHOKE = 0,
@@ -110,16 +125,60 @@ enum MSG_TYPE {
 };
 
 typedef struct Message {
-  int length;
+  uint32_t length;
   enum MSG_TYPE type;
   void *payload;
 } Message;
 
+
+enum PIECE_STATE {
+  PS_INIT = 0,
+  PS_DOWNLOADING,
+  PS_DOWNLOADED,
+  PS_FLUSHED
+};
+
+typedef struct _Piece {
+  uint32_t piece_idx;
+  enum PIECE_STATE state;
+  Peer *current_peer;
+  String hash;
+
+  // After a piece is activated
+  uint64_t piece_length;
+  uint32_t block_size;
+  uint32_t total_blocks;
+  uint32_t last_block_size;
+
+  // After a piece is activate and while is downloading or downloaded
+  uint8_t* buffer;
+  uint8_t* asked_blocks;
+  uint8_t* recieved_blocks;
+  uint32_t recieved_count;
+  uint32_t outstanding_requests_count;
+} Piece;
+
+typedef struct Torrent {
+  Piece *pieces;
+  int n_pieces;
+  int active_pieces;
+  int downloaded_pieces;
+  FILE *output_file;
+
+  // Init
+  String infohash;
+  uint64_t piece_length;
+  uint64_t file_length;
+} Torrent;
+
 uint64_t torrent_total_length(Value *info);
 String info_hash(Value* torrent);
-void connect_peer(Peer *p, struct sockaddr_in addr);
-void do_handshake(Peer *p, String infohash);
-String download_piece(Value *torrent, Peer *p, int piece_idx);
+bool connect_peer(Peer *p, struct sockaddr_in addr);
+int start_communication_loop(Peer *peers, int n_peers, Torrent *o);
+Torrent create_torrent(Value *torrent);
+void free_torrent(Torrent *o);
+Peer create_peer(int peer_idx, int n_pieces, size_t buffer_size);
+void free_peer(Peer *p);
 
 // tracker.c
 int fetch_peers(Value *torrent, struct sockaddr_in **peers);
@@ -133,6 +192,9 @@ int parse_peer_addresses(String *peers, struct sockaddr_in **peer_addrs);
 uint32_t read_uint32(void *buffer, int offset);
 int ceil_division(int divident, int divisor);
 void pprint_sockaddr(struct sockaddr_in addr);
+bool aref_bit(uint8_t *bitmap, int n_bytes, int index);
+void setf_bit(uint8_t *bitmap, int n_bytes, int index, bool value);
+
 
 #ifndef htonll
 #define htonll(x) ((1==htonl(1)) ? (x) : (((uint64_t)htonl((x) & 0xFFFFFFFFUL)) << 32) | htonl((uint32_t)((x) >> 32)))

@@ -108,3 +108,30 @@ void pprint_sockaddr(struct sockaddr_in addr) {
 int ceil_division(int divident, int divisor) {
   return divident / divisor + (divident % divisor == 0 ? 0 : 1);
 }
+
+bool aref_bit(uint8_t *bitmap, int n_bytes, int index) {
+  int byte_index = index / 8;
+  int bit_index = index % 8;
+  if (n_bytes <= byte_index) {
+    fprintf(stderr, "[BUG] can't dereference %d-th bit in an bit array of %d bytes\n", index, n_bytes);
+    return false;
+  }
+  uint8_t byte = *(bitmap + byte_index);
+  return (byte >> (7 - bit_index)) & 0x1;
+}
+
+void setf_bit(uint8_t *bitmap, int n_bytes, int index, bool value) {
+  int byte_index = index / 8;
+  int bit_index = index % 8;
+  if (n_bytes <= byte_index) {
+    fprintf(stderr, "[BUG] can't dereference %d-th bit in an bit array of %d bytes\n", index, n_bytes);
+  }
+  uint8_t byte = *(bitmap + byte_index);
+  uint8_t new_byte;
+  if (value == 1) {
+    new_byte = byte | (1 << (7 - bit_index));
+  } else {
+    new_byte = byte & (0xFF - (1 << (7 - bit_index)));
+  }
+  *(bitmap + byte_index) = new_byte;
+}
