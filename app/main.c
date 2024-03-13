@@ -265,6 +265,8 @@ int main(int argc, char *argv[]) {
           fprintf(stdout, "Coulndn't open output file %s\n", output_path);
           return 1;
         }
+        FILE *log = fopen("/tmp/log", "w");
+        t.summary_file = log;
         t.output_file = file;
 
         // 6. Create and connect Peers

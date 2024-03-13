@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <time.h>
 
 #ifndef APP_INCLUDES
 enum Type {
@@ -80,13 +81,13 @@ void SHA1(char *hash_out, const char *str, uint32_t len);
 // torrent.c
 enum PeerStage {
   S_INIT = 0,
-  S_CONNECTING,
-  S_CONNECTED,
-  S_WAIT_HANDSHAKE,
-  S_HANDSHAKED,
-  S_ACTIVE,
-  S_ERROR,
-  S_DONE,
+  S_CONNECTING = 1,
+  S_CONNECTED = 2,
+  S_WAIT_HANDSHAKE = 3,
+  S_HANDSHAKED = 4,
+  S_ACTIVE = 5,
+  S_ERROR = 6,
+  S_DONE = 7,
 };
 
 struct _Piece;
@@ -158,6 +159,10 @@ typedef struct _Piece {
   uint8_t* recieved_blocks;
   uint32_t recieved_count;
   uint32_t outstanding_requests_count;
+
+  uint32_t speed_bytes_recieved;
+  float speed_timestamp_ms;
+  float speed_ma;
 } Piece;
 
 typedef struct Torrent {
@@ -166,6 +171,7 @@ typedef struct Torrent {
   int active_pieces;
   int downloaded_pieces;
   FILE *output_file;
+  FILE *summary_file;
 
   // Init
   String infohash;
