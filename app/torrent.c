@@ -12,80 +12,13 @@
 #include <time.h>
 #include <unistd.h>
 #include "app.h"
+#include "packets.h"
 
 #define DEBUG false
-#define DEBUG_HANDSHAKE false
-#define DEBUG_MSG false
-#define DEBUG_MSG_BYTES false
 #define DEBUG_MSGTYPE false
 
 time_t NOW = 0;
 float NOW_MS = 0.0f;
-
-void send_handshake(String *infohash, int fd) {
-  if (DEBUG_HANDSHAKE) printf("Sending handshake at %d \n\t", fd);
-
-  // Prepare handshake message
-  char buffer[1024];
-  Cursor cur = { .str = buffer };
-  // 1 byte = 19 (decimal)
-  buffer[0] = 19; cur.str++;
-  // 19 bytes string BitTorrent protocol
-  append_str("BitTorrent protocol", &cur);
-  // 8 zero bytes
-  memset(cur.str, 0, 8); cur.str += 8;
-  // 20 bytes infohash
-  append_string(infohash, &cur);
-  // 20 bytes peer id
-  append_str("BPTtorrent0000000000", &cur);
-
-  // Send
-  if (DEBUG_HANDSHAKE) {
-    pprint_hex(buffer, cur.str - buffer);
-    printf("\n");
-  }
-  send(fd, buffer, cur.str - buffer, 0);
-}
-
-void send_msg(Peer *p, Message msg) {
-  if (DEBUG_MSG_BYTES) {
-    printf("  Sending message {.length: %u, .type: %d}\n\t", msg.length, msg.type);
-    pprint_hex(msg.payload, msg.length);
-    printf("\n");
-  }
-
-  p->last_msg_time = NOW;
-  if (msg.type == MSG_KEEPALIVE) { //
-    send(p->sock, "\0\0\0\0", 4, 0);
-  } else if (msg.length == 0) {
-    uint8_t buffer[5] = {0};
-    buffer[3] = 1;
-    buffer[4] = msg.type;
-    send(p->sock, buffer, 5, 0);
-  } else {
-    uint8_t buffer[5 + msg.length];
-    *(uint32_t *)buffer = htonl(msg.length + 1);
-    buffer[4] = msg.type;
-    memcpy(buffer + 5, msg.payload, msg.length);
-    size_t sent = send(p->sock, buffer, msg.length + 5, 0);
-    if (sent != msg.length + 5) {
-      fprintf(stderr, "[TODO] Couln't send whole message. Tried: %u, Sent: %zu\n",  msg.length + 5, sent);
-      exit(1);
-    }
-  }
-}
-
-void send_bitfield(Torrent *t, Peer *p) {
-  int bytes = ceil_division(t->n_pieces, 8);
-  uint8_t bits[bytes];
-  memset(bits, 0, bytes);
-  for (int i=0; i<t->n_pieces; i++) {
-    int have = t->pieces[i].state == PS_DOWNLOADED;
-    setf_bit(bits, bytes, i, have);
-  }
-  Message msg = { .type = MSG_BITFIELD, .length = bytes, .payload = bits};
-  send_msg(p, msg);
-}
 
 bool connect_peer(Peer *p, struct sockaddr_in addr) {
   if (DEBUG) {
@@ -117,27 +50,6 @@ bool connect_peer(Peer *p, struct sockaddr_in addr) {
   return true;
 }
 
-int peer_recv(Peer *p) {
-  size_t bytes = recv(p->sock, p->recvbuffer + p->recv_bytes, p->buffer_size - p->recv_bytes, 0);
-  if (bytes == -1) {
-    fprintf(stderr, "Error occured while recv: %d %s\n", errno, strerror(errno));
-    p->stage = S_ERROR;
-    return 0;
-  } else if (bytes == 0) {
-    fprintf(stderr, "Peer disconnected without sending\n");
-    p->stage = S_ERROR;
-    return 0;
-  }
-
-  if (DEBUG_MSG_BYTES) printf("  Recieved %zu bytes from %d at %d\n", bytes, p->peer_idx, p->sock);
-  p->recv_bytes += bytes;
-  p->last_msg_time = NOW;
-  if (p->piece != NULL) {
-    p->piece->speed_bytes_recieved += bytes;
-  }
-  return bytes;
-}
-
 bool process_handshake(Peer *p) {
   if (p->recv_bytes < 68) {
     fprintf(stderr, "Recieved input is invalid for handshake\n");
@@ -151,79 +63,6 @@ bool process_handshake(Peer *p) {
   if (DEBUG) printf("Handshake complete\n");
   p->stage = S_HANDSHAKED;
   return true;
-}
-
-Message pop_message(Peer *p) {
-  if (DEBUG_MSG) printf("  Poping messgage. {.processed = %d, .recieved = %d }\n", p->processed_bytes, p->recv_bytes);
-
-  Message msg = {0};
-  if (p->recv_bytes == p->processed_bytes) {
-    msg.type = MSG_NULL;
-    if (DEBUG_MSG) printf("No new mssages\n");
-
-    return msg;
-  }
-
-  uint8_t *buffer = p->recvbuffer + p->processed_bytes;
-  uint32_t msg_len = read_uint32(buffer, 0);
-
-  if (msg_len == 0) { // Keepalive msg
-    if (DEBUG_MSG) printf("    Popped KEEPALIVE messgage\n");
-
-    msg.type = MSG_KEEPALIVE;
-    p->processed_bytes += 4;
-    return msg;
-
-  } else if (p->recv_bytes - p->processed_bytes < msg_len + 4) {
-    if (DEBUG_MSG) printf("    Full data of message not recieved. Required: %u, Got: %d\n", msg_len + 4, p->recv_bytes - p->processed_bytes);
-    msg.type = MSG_INCOMPLETE;
-    msg.length = 0;
-    msg.payload = NULL;
-    return msg;
-
-  } else {
-    uint8_t msg_type = *(buffer + 4);
-    msg.type = (enum MSG_TYPE)msg_type;
-    msg.length = msg_len - 1; // don't count 1 byte of msg_type
-    msg.payload = buffer + 5;
-
-    if (DEBUG_MSG) printf("\tPopped messgage: {.length=%u, .type=%d}\n", msg.length, msg.type);
-    if (DEBUG_MSG_BYTES) {
-      printf("\t\t"); pprint_hex(p->recvbuffer + p->processed_bytes, msg_len + 4); printf("\n");
-    }
-
-    p->processed_bytes += msg_len + 4;
-    return msg;
-  }
-}
-
-void shift_recvbuffer(Peer *p) {
-  if (p->recv_bytes == p->processed_bytes) {
-    p->recv_bytes = 0;
-    p->processed_bytes = 0;
-  } else if (p->recv_bytes > 3 * p->buffer_size / 2) {
-    if (DEBUG) {
-      printf("Shifting recvbuffer of peer: %d\n", p->peer_idx);
-      printf("[recvbuffer] recv_bytes: %d, processed_bytes: %d, buffer_size: %d\n", p->recv_bytes, p->processed_bytes, p->buffer_size);
-    }
-
-    if (p->processed_bytes > 0) {
-      int bytes_to_shift = p->recv_bytes - p->processed_bytes;
-      uint8_t *from = p->recvbuffer + p->processed_bytes;
-      uint8_t *to = p->recvbuffer;
-      p->recv_bytes -= bytes_to_shift;
-      p->processed_bytes -= bytes_to_shift;
-      while (bytes_to_shift > 0) {
-        *(to++) = *(from++);
-        bytes_to_shift--;
-      }
-      if (DEBUG) {
-        printf("shifted to recv_bytes: %d, processed_bytes: %d, buffer_size: %d\n", p->recv_bytes, p->processed_bytes, p->buffer_size);
-      }
-    }
-  } else {
-    if (DEBUG) printf("[recvbuffer] recv_bytes: %d, processed_bytes: %d, buffer_size: %d\n", p->recv_bytes, p->processed_bytes, p->buffer_size);
-  }
 }
 
 // Initialize piece for download
@@ -462,15 +301,6 @@ Piece *select_piece_for_download(Torrent *t, Peer *peer) {
   return NULL;
 }
 
-Piece *find_piece(Torrent *t, uint32_t piece_idx) {
-  for(int i=0; i < t->n_pieces; i++) {
-    if (t->pieces[i].piece_idx == piece_idx) {
-      return t->pieces + i;
-    }
-  }
-  return NULL;
-}
-
 Torrent create_torrent(Value *torrent) {
   String infohash = info_hash(torrent);
   Value *info = gethash_safe(torrent, "info", TDict);
@@ -609,24 +439,6 @@ void deactivate_peer_and_piece(Torrent *t, Peer *peer) {
   peer->piece = NULL;
 }
 
-void send_interested(Peer *peer) {
-  if (DEBUG) printf("Sending INTERESTED\n");
-  Message interested_msg = {.length = 0, .type = MSG_INTERESTED, .payload = NULL};
-  send_msg(peer, interested_msg);
-}
-
-void send_unchoke(Peer *peer) {
-  if (DEBUG) printf("Sending UNCHOKE\n");
-  Message unchoke_mssg = {.length = 0, .type = MSG_UNCHOKE, .payload = NULL};
-  send_msg(peer, unchoke_mssg);
-}
-
-void send_keepalive(Peer *peer) {
-  if (DEBUG) printf("Sending KEEPALIVE\n");
-  Message keepalive = { .type = MSG_KEEPALIVE, .length = 0, .payload = NULL};
-  send_msg(peer, keepalive);
-}
-
 void process_peer_read(Peer *peer, Torrent *t) {
   if (DEBUG) printf("[msg from %d]\n", peer->peer_idx);
   fflush(stdout);
@@ -690,10 +502,7 @@ void process_peer_read(Peer *peer, Torrent *t) {
 
     } else if (msg.type == MSG_BITFIELD) {
       if (DEBUG_MSGTYPE) printf(" Got BITFIELD\n");
-      if (DEBUG_MSG_BYTES) {
-        pprint_hex(msg.payload, msg.length);
-        printf("\n");
-      }
+
       bool has_interesting_piece = false;
       for (int i=0; i < t->n_pieces; i++) {
         Piece *piece = t->pieces + i;

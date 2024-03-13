@@ -179,6 +179,9 @@ typedef struct Torrent {
   uint64_t file_length;
 } Torrent;
 
+extern time_t NOW;
+extern float NOW_MS;
+
 uint64_t torrent_total_length(Value *info);
 String info_hash(Value* torrent);
 bool connect_peer(Peer *p, struct sockaddr_in addr);
