@@ -195,6 +195,9 @@ int fetch_peers(Value *torrent, struct sockaddr_in **peers);
 uint64_t torrent_total_length(Value *info);
 String info_hash(Value *torrent);
 
+// print_summary.c
+void print_summary(Peer *peers, uint16_t n_peers, Torrent *t);
+
 // utils.c
 void url_encode(String *string, Cursor *cur);
 void append_string(String *string, Cursor *cur);
