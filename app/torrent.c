@@ -13,11 +13,11 @@
 #include <unistd.h>
 #include "app.h"
 
-#define DEBUG true
-#define DEBUG_HANDSHAKE true
-#define DEBUG_MSG true
+#define DEBUG false
+#define DEBUG_HANDSHAKE false
+#define DEBUG_MSG false
 #define DEBUG_MSG_BYTES false
-#define DEBUG_MSGTYPE true
+#define DEBUG_MSGTYPE false
 
 time_t NOW = 0;
 float NOW_MS = 0.0f;
@@ -478,8 +478,10 @@ Piece *select_piece_for_download(Torrent *t, Peer *peer) {
     return NULL;
   }
 
-  printf("Selecting piece for download\n");
-  printf("peer bitmap: "); pprint_hex(peer->bitmap, peer->bitmap_size);printf("\n");
+  if (DEBUG) {
+    printf("Selecting piece for download\n");
+    printf("peer bitmap: "); pprint_hex(peer->bitmap, peer->bitmap_size);printf("\n");
+  }
   // find an inactive piece
   for (int i=0; i<t->n_pieces; i++) {
     Piece p = t->pieces[i];
