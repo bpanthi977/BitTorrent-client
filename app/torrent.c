@@ -8,6 +8,8 @@
 #include <curl/curl.h>
 #include <string.h>
 #include <fcntl.h>
+#include <sys/time.h>
+#include <time.h>
 #include <unistd.h>
 #include "app.h"
 
@@ -16,6 +18,8 @@
 #define DEBUG_MSG true
 #define DEBUG_MSG_BYTES false
 #define DEBUG_MSGTYPE true
+
+time_t NOW = 0;
 
 String info_hash(Value* torrent) {
   String hash_string = { 0 };
@@ -84,6 +88,7 @@ void send_msg(Peer *p, Message msg) {
     printf("\n");
   }
 
+  p->last_msg_time = NOW;
   if (msg.type == MSG_KEEPALIVE) { //
     send(p->sock, "\0\0\0\0", 4, 0);
   } else if (msg.length == 0) {
@@ -160,6 +165,7 @@ int peer_recv(Peer *p) {
 
   if (DEBUG_MSG_BYTES) printf("  Recieved %zu bytes from %d at %d\n", bytes, p->peer_idx, p->sock);
   p->recv_bytes += bytes;
+  p->last_msg_time = NOW;
   return bytes;
 }
 
@@ -552,20 +558,68 @@ Piece *activate_peer_and_piece(Torrent *t, Peer *peer) {
   return NULL;
 }
 
-void print_summary(Torrent *t) {
+int count_interesting_pieces(Torrent *t, Peer *p) {
+  int count = 0;
+  for (int piece_idx = 0; piece_idx < t->n_pieces; piece_idx++) {
+    Piece *piece = t->pieces + piece_idx;
+    if (piece->state == PS_INIT && aref_bit(p->bitmap, p->bitmap_size, piece_idx) == 1) {
+      count++;
+    }
+  }
+  return count;
+}
+
+void select_peer_and_piece(Peer *peers, int n_peers, Torrent *t) {
+  if (t->downloaded_pieces + t->active_pieces >= t->n_pieces) return;
+
+  Peer *best_peer = NULL;
+  int best_peer_interesting_pieces = 0;
+  int best_priority = 0;
+  for (int i=0; i<n_peers; i++) {
+    Peer *p = peers + i;
+    if (p->unchoked && p->stage == S_HANDSHAKED) {
+      int count =  count_interesting_pieces(t, p);
+      if (count > 0) {
+        if (!best_peer) {
+          best_peer = p;
+          best_peer_interesting_pieces = count_interesting_pieces(t, p);
+          best_priority = p->priority;
+        } else {
+          if (p->priority >= best_priority && (count > best_peer_interesting_pieces)) {
+            best_peer = p;
+            best_peer_interesting_pieces = count;
+            best_priority = p->priority;
+          }
+        }
+      }
+    }
+  }
+
+  if (best_peer != NULL) {
+    Piece *piece = activate_peer_and_piece(t, best_peer);
+    if (piece != NULL) {
+      request_piece_blocks(best_peer, piece);
+    } else {
+      fprintf(stderr, "[BUG] unable to select piece for best_peer %d\n", best_peer->peer_idx);
+      exit(1);
+    }
+  }
+}
+
+void print_summary(Peer *peers, uint16_t n_peers, Torrent *t) {
 }
 
 // Does cleanup on piece only if its in DOWNLOADING or FLUSHED stage
 void deactivate_peer_and_piece(Torrent *t, Peer *peer) {
-
-  if (peer->stage != S_ACTIVE) {
+  if (!(peer->stage == S_ACTIVE || peer->stage == S_ERROR)) {
     fprintf(stderr, "[BUG] deactivate_peer called on peer %d at stage: %d\n", peer->peer_idx, peer->stage);
     exit(1);
   }
   if (peer->piece == NULL) {
-    fprintf(stderr, "[BUG] peer %d is active but peer.piece is null\n", peer->peer_idx);
+    fprintf(stderr, "[BUG] peer %d is at stage %d but peer.piece is null\n", peer->peer_idx, peer->stage);
     exit(1);
   }
+
   // Cleanup state in piece
   Piece *piece = peer->piece;
   piece->current_peer = NULL;
@@ -576,7 +630,8 @@ void deactivate_peer_and_piece(Torrent *t, Peer *peer) {
   }
 
   // Cleanup state in peer
-  peer->stage = S_HANDSHAKED;
+  if (peer->stage != S_ERROR)
+    peer->stage = S_HANDSHAKED;
   peer->piece = NULL;
 }
 
@@ -590,6 +645,12 @@ void send_unchoke(Peer *peer) {
   if (DEBUG) printf("Sending UNCHOKE\n");
   Message unchoke_mssg = {.length = 0, .type = MSG_UNCHOKE, .payload = NULL};
   send_msg(peer, unchoke_mssg);
+}
+
+void send_keepalive(Peer *peer) {
+  if (DEBUG) printf("Sending KEEPALIVE\n");
+  Message keepalive = { .type = MSG_KEEPALIVE, .length = 0, .payload = NULL};
+  send_msg(peer, keepalive);
 }
 
 void process_peer_read(Peer *peer, Torrent *t) {
@@ -689,7 +750,6 @@ void process_peer_read(Peer *peer, Torrent *t) {
           // request_piece_blocks(peer, piece);
         } else {
           printf("Download complete for piece %d\n", piece->piece_idx);
-          print_summary(t);
           if (verify_piece(piece)) {
             piece->state = PS_DOWNLOADED;
             t->downloaded_pieces++;
@@ -716,6 +776,10 @@ void process_peer_read(Peer *peer, Torrent *t) {
     msg = pop_message(peer);
   }
 
+  if (peer->stage == S_ERROR && peer->piece != NULL) {
+    deactivate_peer_and_piece(t, peer);
+  }
+
   bool download_complete = t->downloaded_pieces >= t->n_pieces;
   if (download_complete) {
     // Do nothing
@@ -733,7 +797,39 @@ void process_peer_read(Peer *peer, Torrent *t) {
   }
 }
 
+time_t prev_time = 0;
+
+void send_keepalives_and_disconnects(Peer *peers, int n_peers, Torrent *t) {
+  time_t diff = NOW - prev_time;
+
+  bool deactivated_piece = 0;
+  if (diff > 2) {
+    for (int i = 0; i < n_peers; i++) {
+      Peer *p = peers + i;
+      // Check for peers that don't answer outstanding piece requests
+      if (p->piece != NULL && (NOW - p->last_msg_time > 10)) {
+        printf("Deactivating peer (%d) and piece (%d). Because no block recieved in last 10 seconds\n", p->peer_idx, p->piece->piece_idx);
+        deactivate_peer_and_piece(t, p);
+        p->priority--;
+      }
+
+      // Every 30 seconds check if anyone needs a keepalive to be sent
+      if ((p->stage == S_HANDSHAKED || p->stage == S_ACTIVE) &&
+          NOW - p->last_msg_time > 30) {
+        send_keepalive(p);
+      }
+    }
+  }
+  if (deactivated_piece) {
+    select_peer_and_piece(peers, n_peers, t);
+  }
+  prev_time = NOW;
+}
+
+
 int start_communication_loop(Peer *peers, int n_peers, Torrent *t) {
+  time_t baseline_secs = time(NULL);
+
   int nfds = 0;
   for (int idx = 0; idx < n_peers; idx++) {
     if (peers[idx].sock + 1 > nfds)
@@ -742,7 +838,7 @@ int start_communication_loop(Peer *peers, int n_peers, Torrent *t) {
 
   // Main loop
   fd_set readfds, writefds;
-
+  struct timeval timeout = {};
   int done = false;
   printf("Starting communication loop with nfds: %d, n_peers: %d\n", nfds, n_peers);
   while (!done) {
@@ -762,9 +858,10 @@ int start_communication_loop(Peer *peers, int n_peers, Torrent *t) {
     if (n_active == 0) break;
     // Wait for event
     if (DEBUG) printf("[[Waiting for events]] ");
-    int ready_count = select(nfds, &readfds, &writefds, NULL,
-                             NULL // block indefinitely
-    );
+
+    timeout.tv_sec = 5;
+    timeout.tv_usec = 0;
+    int ready_count = select(nfds, &readfds, &writefds, NULL, &timeout);
     if (ready_count == -1) {
       fprintf(stderr, "select failed with error: %d %s\n", errno, strerror(errno));
       return 1;
@@ -772,6 +869,9 @@ int start_communication_loop(Peer *peers, int n_peers, Torrent *t) {
       if (DEBUG) printf(" got %d\n", ready_count);
     }
 
+    struct timeval now;
+    gettimeofday(&now, NULL);
+    NOW = now.tv_sec - baseline_secs;
     // Process event
     for (int i=0; i<n_peers; i++) {
       Peer *p = peers + i;
@@ -801,6 +901,8 @@ int start_communication_loop(Peer *peers, int n_peers, Torrent *t) {
           peer->stage = S_DONE;
         }
       }
+    } else {
+      send_keepalives_and_disconnects(peers, n_peers, t);
     }
   }
   return 0;

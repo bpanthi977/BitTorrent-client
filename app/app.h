@@ -97,6 +97,8 @@ typedef struct Peer {
   uint8_t *bitmap;
   uint8_t bitmap_size;
 
+  int priority;
+  time_t last_msg_time;
   uint8_t *recvbuffer;
   int buffer_size;
   int recv_bytes;
