@@ -191,6 +191,10 @@ void free_peer(Peer *p);
 // tracker.c
 int fetch_peers(Value *torrent, struct sockaddr_in **peers);
 
+// torrent_utils.c
+uint64_t torrent_total_length(Value *info);
+String info_hash(Value *torrent);
+
 // utils.c
 void url_encode(String *string, Cursor *cur);
 void append_string(String *string, Cursor *cur);
