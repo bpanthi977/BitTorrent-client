@@ -43,7 +43,7 @@ void print_summary(Peer *peers, uint16_t n_peers, Torrent *t) {
 
       if (p->speed_timestamp_ms != 0) {
         if (NOW_MS - p->speed_timestamp_ms > 500) {
-          float instantaneous_speed = ((float) p->speed_bytes_recieved) / (NOW_MS - p->speed_timestamp_ms) * 1000 / 1024; // kiB/s
+          float instantaneous_speed = ((float) p->speed_bytes_recieved) / (NOW_MS - p->speed_timestamp_ms) * 1000 / 1024; // KiB/s
           p->speed_ma = p->speed_ma * 0.9 + 0.1 * instantaneous_speed;
           p->speed_bytes_recieved = 0;
           p->speed_timestamp_ms = NOW_MS;
@@ -55,19 +55,51 @@ void print_summary(Peer *peers, uint16_t n_peers, Torrent *t) {
       total_ma_speed += p->speed_ma;
     }
 
-    fprintf(out, "Speed: %6.2f [%6.2f] kiB/s\n\n", total_ma_speed , total_instantaneous_speed);
+    fprintf(out, "Speed: %6.2f [%6.2f] KiB/s\n\n", total_ma_speed , total_instantaneous_speed);
 
     fprintf(out, "Pieces\n");
-    fprintf(out, "Init:       %3d; Downloading:%3d; Downloaded:    %3d\n",
+    fprintf(out, "Init:   %5d; Downloading:  %5d; Downloaded:   %5d  Pieces\n",
            stages[PS_INIT], stages[PS_DOWNLOADING], stages[PS_DOWNLOADED] + stages[PS_FLUSHED]);
-    fprintf(out, "Init    %5.2f; Downloaded:%5.2f; Flushed:  %5.2f  MiB\n",
+    fprintf(out, "Init: %7.2f; Downloaded: %7.2f; Flushed:    %7.2f  MiB\n\n",
             sizes[PS_INIT]       / 1024.0 / 1024.0,
             sizes[PS_DOWNLOADED] / 1024.0 / 1024.0,
             sizes[PS_FLUSHED]    / 1024.0 / 1024.0);
 
-    for (int i=0; i<t->n_pieces; i++) {
-      Piece *p = t->pieces + i;
-      fprintf(out, "Piece %3d; [%3d (%3d) / %3d] \n", p->piece_idx, p->recieved_count, p->outstanding_requests_count, p->total_blocks);
+  }
+
+  {
+    // Active peers
+    fprintf(out, "\nActive Peers\n");
+    for (int i = 0; i < n_peers; i++) {
+      Peer *p = peers + i;
+      if (p->stage == S_ACTIVE) {
+        Piece *piece = p->piece;
+        fprintf(out, "Peer %3d (%3.0f%%): Piece %5d (%4d / %4d) @ %8.2f KiB/s\n",
+                p->peer_idx, ((float)count_available_pieces(p, t->n_pieces)) / t->n_pieces * 100, piece->piece_idx,
+                piece->recieved_count,piece->total_blocks,
+                piece->speed_ma);
+      }
+    }
+
+    // Handshaked Peers
+    fprintf(out, "\nHandshaked Peers\n");
+    for (int i = 0; i < n_peers; i++) {
+      Peer *p = peers + i;
+      if (p->stage == S_HANDSHAKED) {
+        int available_pieces =  count_available_pieces(p, t->n_pieces);
+        int interesting_pieces = count_interesting_pieces(t, p);
+
+        Piece *piece = p->piece;
+        fprintf(out, "Peer %3d (%3.0f%%): Has %5d pieces, Interested in %5d pieces, %s\n",
+                p->peer_idx, ((float)available_pieces / t->n_pieces * 100), available_pieces, interesting_pieces,
+                p->unchoked ? "Unchoked" : "Choked");
+      }
+    }
+
+    // Other peers
+    for (int i = 0; i < n_peers; i++) {
+      enum PeerStage s = peers[i].stage;
+      if (!(s == S_HANDSHAKED || s == S_ACTIVE)) fprintf(out, "\n");
     }
   }
 }

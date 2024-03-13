@@ -197,6 +197,8 @@ int fetch_peers(Value *torrent, struct sockaddr_in **peers);
 // torrent_utils.c
 uint64_t torrent_total_length(Value *info);
 String info_hash(Value *torrent);
+int count_interesting_pieces(Torrent *t, Peer *p);
+int count_available_pieces(Peer *p, int n_pieces);
 
 // print_summary.c
 void print_summary(Peer *peers, uint16_t n_peers, Torrent *t);

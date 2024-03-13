@@ -35,3 +35,24 @@ String info_hash(Value* torrent) {
   hash_string.str = hash;
   return hash_string;
 }
+
+int count_interesting_pieces(Torrent *t, Peer *p) {
+  int count = 0;
+  for (int piece_idx = 0; piece_idx < t->n_pieces; piece_idx++) {
+    Piece *piece = t->pieces + piece_idx;
+    if (piece->state == PS_INIT && aref_bit(p->bitmap, p->bitmap_size, piece_idx) == 1) {
+      count++;
+    }
+  }
+  return count;
+}
+
+int count_available_pieces(Peer *p, int n_pieces) {
+  int count = 0;
+  for (int piece_idx = 0; piece_idx < n_pieces; piece_idx++) {
+    if (aref_bit(p->bitmap, p->bitmap_size, piece_idx) == 1) {
+      count++;
+    }
+  }
+  return count;
+}
