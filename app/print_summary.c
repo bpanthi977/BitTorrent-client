@@ -44,6 +44,7 @@ void print_summary(Peer *peers, uint16_t n_peers, Torrent *t) {
       if (p->speed_timestamp_ms != 0) {
         if (NOW_MS - p->speed_timestamp_ms > 500) {
           float instantaneous_speed = ((float) p->speed_bytes_recieved) / (NOW_MS - p->speed_timestamp_ms) * 1000 / 1024; // KiB/s
+          if (p->speed_ma == -1) p->speed_ma = 0; // init
           p->speed_ma = p->speed_ma * 0.9 + 0.1 * instantaneous_speed;
           p->speed_bytes_recieved = 0;
           p->speed_timestamp_ms = NOW_MS;
@@ -54,6 +55,8 @@ void print_summary(Peer *peers, uint16_t n_peers, Torrent *t) {
       }
       total_ma_speed += p->speed_ma;
     }
+
+    t->total_ma_speed_download = total_ma_speed;
 
     fprintf(out, "Speed: %6.2f [%6.2f] KiB/s\n\n", total_ma_speed , total_instantaneous_speed);
 
@@ -74,10 +77,12 @@ void print_summary(Peer *peers, uint16_t n_peers, Torrent *t) {
       Peer *p = peers + i;
       if (p->stage == S_ACTIVE) {
         Piece *piece = p->piece;
-        fprintf(out, "Peer %3d (%3.0f%%): Piece %5d (%4d / %4d) @ %8.2f KiB/s\n",
+        fprintf(out, "Peer %3d (%3.0f%%): Piece %5d (%4d / %4d) @ %8.2f KiB/s Priority: %d Last Msg: %ld\n",
                 p->peer_idx, ((float)count_available_pieces(p, t->n_pieces)) / t->n_pieces * 100, piece->piece_idx,
                 piece->recieved_count,piece->total_blocks,
-                piece->speed_ma);
+                piece->speed_ma == -1 ? 0 : piece->speed_ma,
+                p->priority,
+                NOW - p->last_msg_time);
       }
     }
 
@@ -90,9 +95,10 @@ void print_summary(Peer *peers, uint16_t n_peers, Torrent *t) {
         int interesting_pieces = count_interesting_pieces(t, p);
 
         Piece *piece = p->piece;
-        fprintf(out, "Peer %3d (%3.0f%%): Has %5d pieces, Interested in %5d pieces, %s\n",
+        fprintf(out, "Peer %3d (%3.0f%%): Has %5d pieces, Interested in %5d pieces, %s, Priority: %d \n",
                 p->peer_idx, ((float)available_pieces / t->n_pieces * 100), available_pieces, interesting_pieces,
-                p->unchoked ? "Unchoked" : "Choked");
+                p->unchoked ? "Unchoked" : "Choked",
+                p->priority);
       }
     }
 

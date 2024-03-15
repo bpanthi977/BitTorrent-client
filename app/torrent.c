@@ -106,7 +106,7 @@ bool initalize_piece_for_download(Torrent *t, Peer *p, Piece *piece) {
   // Reset stats for speed
   piece->speed_bytes_recieved = 0;
   piece->speed_timestamp_ms = NOW_MS;
-  piece->speed_ma = 0;
+  piece->speed_ma = -1;
 
   printf("Downloading piece %d of size %llu in %d blocks \n", piece_idx, piece_length, total_blocks);
   return true;
@@ -364,25 +364,22 @@ Piece *activate_peer_and_piece(Torrent *t, Peer *peer) {
   return NULL;
 }
 
-void select_peer_and_piece(Peer *peers, int n_peers, Torrent *t) {
-  if (t->downloaded_pieces + t->active_pieces >= t->n_pieces) return;
+Peer *select_peer_and_piece(Peer *peers, int n_peers, Torrent *t) {
+  if (t->downloaded_pieces + t->active_pieces >= t->n_pieces) return NULL;
 
   Peer *best_peer = NULL;
-  int best_peer_interesting_pieces = 0;
   int best_priority = 0;
   for (int i=0; i<n_peers; i++) {
     Peer *p = peers + i;
     if (p->unchoked && p->stage == S_HANDSHAKED) {
-      int count =  count_interesting_pieces(t, p);
+      int count = count_interesting_pieces(t, p);
       if (count > 0) {
         if (!best_peer) {
           best_peer = p;
-          best_peer_interesting_pieces = count_interesting_pieces(t, p);
           best_priority = p->priority;
         } else {
-          if (p->priority >= best_priority && (count > best_peer_interesting_pieces)) {
+          if (p->priority > best_priority) {
             best_peer = p;
-            best_peer_interesting_pieces = count;
             best_priority = p->priority;
           }
         }
@@ -390,17 +387,33 @@ void select_peer_and_piece(Peer *peers, int n_peers, Torrent *t) {
     }
   }
 
-  if (best_peer != NULL) {
-    Piece *piece = activate_peer_and_piece(t, best_peer);
-    if (piece != NULL) {
-      request_piece_blocks(best_peer, piece);
-    } else {
-      fprintf(stderr, "[BUG] unable to select piece for best_peer %d\n", best_peer->peer_idx);
-      exit(1);
-    }
-  }
+  return best_peer;
 }
 
+Peer *select_peer_for_download(Peer *peers, int n_peers, int piece_idx) {
+  Peer *best_peer = NULL;
+  int best_peer_interesting_pieces = 0;
+  int best_priority = 0;
+  for (int i=0; i<n_peers; i++) {
+    Peer *p = peers + i;
+    if (p->unchoked && p->stage == S_HANDSHAKED) {
+      int has_piece =  aref_bit(p->bitmap, p->bitmap_size, piece_idx);
+      if (has_piece) {
+        if (!best_peer) {
+          best_peer = p;
+          best_priority = p->priority;
+        } else {
+          if (p->priority >= best_priority) {
+            best_peer = p;
+            best_priority = p->priority;
+          }
+        }
+      }
+    }
+  }
+
+  return best_peer;
+}
 
 // Does cleanup on piece only if its in DOWNLOADING or FLUSHED stage
 void deactivate_peer_and_piece(Torrent *t, Peer *peer) {
@@ -574,15 +587,39 @@ time_t prev_time = 0;
 void send_keepalives_and_disconnects(Peer *peers, int n_peers, Torrent *t) {
   time_t diff = NOW - prev_time;
 
-  bool deactivated_piece = 0;
   if (diff > 2) {
     for (int i = 0; i < n_peers; i++) {
       Peer *p = peers + i;
-      // Check for peers that don't answer outstanding piece requests
-      if (p->piece != NULL && (NOW - p->last_msg_time > 10)) {
-        printf("Deactivating peer (%d) and piece (%d). Because no block recieved in last 10 seconds\n", p->peer_idx, p->piece->piece_idx);
-        deactivate_peer_and_piece(t, p);
-        p->priority--;
+      // Check for peers that don't answer outstanding piece requests, or are slow
+      Peer *best_alternative_peer = p->piece == NULL ? NULL : select_peer_for_download(peers, n_peers, p->piece->piece_idx);
+      if (best_alternative_peer != NULL && best_alternative_peer != p) {
+        bool deactivated = false;
+
+        if (NOW - p->last_msg_time > 10) {
+          printf("Deactivating peer (%d) and piece (%d). Because no block "
+                 "recieved in last 10 seconds\n",
+                 p->peer_idx, p->piece->piece_idx);
+          deactivate_peer_and_piece(t, p);
+          p->priority-=10;
+          deactivated = true;
+        } else if (p->piece->speed_ma != -1 && p->piece->speed_ma < t->total_ma_speed_download * 0.1) {
+          // Check for peers that are too slow
+          printf("Deactivating peer (%d) and piece (%d). Because it is very "
+                 "slow\n",
+                 p->peer_idx, p->piece->piece_idx);
+          deactivate_peer_and_piece(t, p);
+          p->priority--;
+          deactivated = true;
+        }
+
+        if (deactivated) {
+          // Find another peer
+          Peer *best_peer = select_peer_and_piece(peers, n_peers, t);
+          if (best_peer != NULL) {
+            Piece *piece = activate_peer_and_piece(t, best_peer);
+            if (piece != NULL) request_piece_blocks(best_peer, piece);
+          }
+        }
       }
 
       // Every 30 seconds check if anyone needs a keepalive to be sent
@@ -590,11 +627,10 @@ void send_keepalives_and_disconnects(Peer *peers, int n_peers, Torrent *t) {
           NOW - p->last_msg_time > 30) {
         send_keepalive(p);
       }
+
     }
   }
-  if (deactivated_piece) {
-    select_peer_and_piece(peers, n_peers, t);
-  }
+
   prev_time = NOW;
 }
 

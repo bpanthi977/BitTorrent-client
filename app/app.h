@@ -177,6 +177,9 @@ typedef struct Torrent {
   String infohash;
   uint64_t piece_length;
   uint64_t file_length;
+
+  // Stats
+  float total_ma_speed_download;
 } Torrent;
 
 extern time_t NOW;
