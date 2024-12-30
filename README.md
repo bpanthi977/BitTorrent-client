@@ -1,35 +1,26 @@
-[![progress-banner](https://backend.codecrafters.io/progress/bittorrent/c7a29233-d43b-4ffa-a2bd-5e37d663c9db)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
+# BitTorrent Client
 
-This is a starting point for C solutions to the
-["Build Your Own BitTorrent" Challenge](https://app.codecrafters.io/courses/bittorrent/overview).
+An implementation of BittTorrent client in C. Made while completing the ["Build Your Own BitTorrent" Challenge](https://app.codecrafters.io/courses/bittorrent/overview).
+# Build
 
-In this challenge, you’ll build a BitTorrent client that's capable of parsing a
-.torrent file and downloading a file from a peer. Along the way, we’ll learn
-about how torrent files are structured, HTTP trackers, BitTorrent’s Peer
-Protocol, pipelining and more.
+1. This project depends on [curl](https://curl.se/). The library is probably already installed in your system. If not download the library and headers following the instructions from the [curl](https://curl.se/) project.
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+2. Run `make` command to build the client binary: `torrent-client`
 
-# Passing the first stage
+# Run
 
-The entry point for your BitTorrent implementation is in `app/main.c`. Study and
-uncomment the relevant code, and push your changes to pass the first stage:
+1. Download file:
 
-```sh
-git add .
-git commit -m "pass 1st stage" # any msg
-git push origin master
-```
+    `torrent-client download sample.torrent sample.txt`
+  
+2. View torrent file info
 
-Time to move on to the next stage!
+    `torrent-client info sample.torrent`
 
-# Stage 2 & beyond
+# Features & Limitations
 
-Note: This section is for stages 2 and beyond.
+1. Can use multiple tracker from announce list
+2. Can use both UDP and HTTP tracker
+3. Single file downloads only 
 
-1. Ensure you have `gcc` installed locally
-1. Run `./your_bittorrent.sh` to run your program, which is implemented in
-   `app/main.c`.
-1. Commit your changes and run `git push origin master` to submit your solution
-   to CodeCrafters. Test output will be streamed to your terminal.
+   
