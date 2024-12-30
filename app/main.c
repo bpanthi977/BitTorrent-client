@@ -13,16 +13,29 @@
 #include <time.h>
 #include "app.h"
 
+void print_help() {
+  printf("Usage: torrent-client <command> <args>\n");
+  printf("Commands:\n");
+  printf("  help                    Show help\n");
+  printf("  info <torrent-file>     Show info about the torrent file.\n");
+  printf("  download <torrent-file> <output-file>\n");
+  printf("      Download file from torrent to output-file location\n");
+}
+
 int main(int argc, char *argv[]) {
     srand(time(NULL));
     if (argc < 3) {
-        fprintf(stderr, "Usage: your_bittorrent.sh <command> <args>\n");
+        fprintf(stderr, "Invalid command usage \n");
+        print_help();
         return 1;
     }
 
     const char* command = argv[1];
+    if (strcmp(command, "help") == 0) {
+        print_help();
+        return 0;
 
-    if (strcmp(command, "decode") == 0) {
+    } else if (strcmp(command, "decode") == 0) {
         char *encoded_str = argv[2];
         Cursor cur = {.str = encoded_str};
         Value *val = decode_bencode(&cur);
@@ -232,9 +245,13 @@ int main(int argc, char *argv[]) {
 
     } else if (strcmp(command, "download") == 0) {
         // 1. Parse args
-        if (argc < 5) return 1;
+        if (argc < 4) {
+          fprintf(stderr, "download arguments insufficient. \n");
+          print_help();
+          return 1;
+        }
+        char *input_path = argv[2];
         char *output_path = argv[3];
-        char *input_path = argv[4];
 
         // 2. Read torrent file
         Value* torrent = read_torrent_file(input_path);
@@ -305,6 +322,7 @@ int main(int argc, char *argv[]) {
         const char *path = argv[2];
         String *buffer = read_file_to_string(path);
         if (buffer == NULL) {
+          fprintf(stderr, "Invalid file: %s\n", path);
           return 1;
         }
         Cursor cur = { .str = buffer->str };
@@ -325,6 +343,7 @@ int main(int argc, char *argv[]) {
 
     } else {
         fprintf(stderr, "Unknown command: %s\n", command);
+        print_help();
         return 1;
     }
 
